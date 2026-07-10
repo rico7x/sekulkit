@@ -59,6 +59,7 @@ router.put('/config/templates/:id', authMiddleware, configController.updateTempl
 router.delete('/config/templates/:id', authMiddleware, configController.deleteTemplate);
 router.get('/config/test-api-key', authMiddleware, configController.testApiKey);
 router.get('/config/openrouter-models', authMiddleware, configController.getOpenRouterModels);
+router.get('/config/remote-models', authMiddleware, configController.getRemoteModels);
 
 // ADMIN
 router.get('/admin/users', authMiddleware, adminOnly, adminController.getUsers);

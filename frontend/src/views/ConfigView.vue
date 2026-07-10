@@ -34,12 +34,43 @@
             <button @click="saveApiKey" class="btn-primary" :disabled="savingKey">
               {{ savingKey ? 'Menyimpan...' : 'Simpan API Key' }}
             </button>
-            <button @click="testApiKey" class="btn-secondary" :disabled="testingKey">
-              {{ testingKey ? 'Testing...' : '🔌 Test Koneksi' }}
+            <button @click="testApiKey('openrouter')" class="btn-secondary" :disabled="testingKey">
+              {{ testingKey ? 'Testing...' : 'Test Koneksi' }}
             </button>
           </div>
           <div v-if="testResult" :class="testResult.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'" class="rounded-lg p-3 text-sm">
             {{ testResult.message }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="font-semibold text-slate-800">9router (opsional)</h3></div>
+        <div class="card-body space-y-4">
+          <p class="text-sm text-slate-600">
+            9router adalah proxy AI lokal. Cocok untuk development atau jika punya endpoint OpenAI-compatible sendiri.
+          </p>
+          <div>
+            <label class="label">Base URL</label>
+            <input v-model="ninerouterBaseUrl" type="text" class="input font-mono" placeholder="http://localhost:20128/v1" />
+          </div>
+          <div>
+            <label class="label">API Key (opsional)</label>
+            <div class="flex gap-2">
+              <input v-model="ninerouterApiKey" :type="showNrKey ? 'text' : 'password'" class="input flex-1 font-mono" placeholder="Kosongkan jika no-auth" />
+              <button @click="showNrKey = !showNrKey" class="btn-secondary">{{ showNrKey ? 'Sembunyikan' : 'Tampilkan' }}</button>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button @click="saveNinerouterConfig" class="btn-primary" :disabled="savingNrKey">
+              {{ savingNrKey ? 'Menyimpan...' : 'Simpan' }}
+            </button>
+            <button @click="testApiKey('9router')" class="btn-secondary" :disabled="testingNrKey">
+              {{ testingNrKey ? 'Testing...' : 'Test Koneksi' }}
+            </button>
+          </div>
+          <div v-if="testNrResult" :class="testNrResult.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'" class="rounded-lg p-3 text-sm">
+            {{ testNrResult.message }}
           </div>
         </div>
       </div>
@@ -48,15 +79,29 @@
     <!-- Tab: Model AI -->
     <div v-if="activeTab === 'models'" class="space-y-5">
       <div class="flex items-center justify-between">
-        <p class="text-sm text-slate-600">Tambahkan model OpenRouter yang ingin digunakan untuk generate soal.</p>
+        <p class="text-sm text-slate-600">Tambahkan model AI yang ingin digunakan untuk generate soal.</p>
         <button @click="openModelForm()" class="btn-primary btn-sm">+ Tambah Model</button>
       </div>
 
-      <!-- Browse from OpenRouter -->
+      <!-- Browse from Provider -->
       <div class="card">
         <div class="card-header">
-          <h3 class="font-semibold text-slate-800 text-sm">🌐 Browse Model OpenRouter</h3>
-          <button @click="loadORModels" class="btn-secondary btn-sm" :disabled="loadingOR">
+          <div class="flex items-center gap-3">
+            <h3 class="font-semibold text-slate-800 text-sm">Cari Model</h3>
+            <div class="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
+              <button @click="browseProvider = 'openrouter'"
+                class="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+                :class="browseProvider === 'openrouter' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                OpenRouter
+              </button>
+              <button @click="browseProvider = '9router'"
+                class="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+                :class="browseProvider === '9router' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                9router
+              </button>
+            </div>
+          </div>
+          <button @click="loadRemoteModels" class="btn-secondary btn-sm" :disabled="loadingOR">
             {{ loadingOR ? 'Memuat...' : 'Muat Daftar Model' }}
           </button>
         </div>
@@ -67,7 +112,7 @@
               <p class="text-sm font-medium text-slate-800 truncate">{{ m.name }}</p>
               <p class="text-xs text-slate-500 font-mono truncate">{{ m.id }}</p>
             </div>
-            <span v-if="m.is_free" class="badge badge-green text-xs">Gratis ⭐</span>
+            <span v-if="m.is_free" class="badge badge-green text-xs">Gratis</span>
             <button @click="quickAddModel(m)" class="btn-secondary btn-sm flex-shrink-0">+ Tambah</button>
           </div>
         </div>
@@ -82,6 +127,7 @@
               <div class="flex items-center gap-2">
                 <p class="font-semibold text-slate-800">{{ m.name }}</p>
                 <span v-if="m.is_default" class="badge badge-primary">Default</span>
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{{ m.provider || 'openrouter' }}</span>
               </div>
               <p class="text-xs text-slate-500 font-mono mt-0.5">{{ m.model_id }}</p>
               <p class="text-xs text-slate-500 mt-1">Max tokens: {{ m.max_tokens }} · Temp: {{ m.temperature }}</p>
@@ -94,7 +140,7 @@
           </div>
         </div>
       </div>
-      <div v-else class="card p-8 text-center text-slate-400 text-sm">Belum ada model. Tambah model OpenRouter di atas.</div>
+      <div v-else class="card p-8 text-center text-slate-400 text-sm">Belum ada model. Tambah model di atas.</div>
     </div>
 
     <!-- Tab: Prompt Templates -->
@@ -133,8 +179,16 @@
             <input v-model="modelForm.name" type="text" class="input" placeholder="cth: Llama 3.1 (Free)" />
           </div>
           <div>
-            <label class="label">Model ID OpenRouter</label>
-            <input v-model="modelForm.model_id" type="text" class="input font-mono" placeholder="cth: meta-llama/llama-3.1-8b-instruct:free" />
+            <label class="label">Provider</label>
+            <select v-model="modelForm.provider" class="input">
+              <option value="openrouter">OpenRouter</option>
+              <option value="9router">9router</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Model ID</label>
+            <input v-model="modelForm.model_id" type="text" class="input font-mono"
+              :placeholder="modelForm.provider === '9router' ? 'cth: gpt-4o-mini' : 'cth: meta-llama/llama-3.1-8b-instruct:free'" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -207,21 +261,30 @@ const tabs = [
   { id: 'templates', label: '📝 Prompt Template' }
 ]
 
-// API Key
+// API Key - OpenRouter
 const apiKey = ref('')
 const showKey = ref(false)
 const savingKey = ref(false)
 const testingKey = ref(false)
 const testResult = ref(null)
 
+// API Key - 9router
+const ninerouterBaseUrl = ref('http://localhost:20128/v1')
+const ninerouterApiKey = ref('')
+const showNrKey = ref(false)
+const savingNrKey = ref(false)
+const testingNrKey = ref(false)
+const testNrResult = ref(null)
+
 // Models
 const models = ref([])
 const orModels = ref([])
 const loadingOR = ref(false)
+const browseProvider = ref('openrouter')
 const showModelForm = ref(false)
 const editModelId = ref(null)
 const savingModel = ref(false)
-const modelForm = ref({ name: '', model_id: '', max_tokens: 4096, temperature: 0.7, notes: '' })
+const modelForm = ref({ name: '', provider: 'openrouter', model_id: '', max_tokens: 4096, temperature: 0.7, notes: '' })
 
 // Templates
 const templates = ref([])
@@ -240,34 +303,60 @@ async function saveApiKey() {
   finally { savingKey.value = false }
 }
 
-async function testApiKey() {
-  testingKey.value = true
-  testResult.value = null
+async function saveNinerouterConfig() {
+  savingNrKey.value = true
   try {
-    const { data } = await api.get('/config/test-api-key')
-    testResult.value = data
-  } catch (err) {
-    testResult.value = { success: false, message: err.response?.data?.message || 'Koneksi gagal' }
-  } finally { testingKey.value = false }
+    if (ninerouterBaseUrl.value) {
+      await api.post('/config', { key: 'ninerouter_base_url', value: ninerouterBaseUrl.value })
+    }
+    await api.post('/config', { key: 'ninerouter_api_key', value: ninerouterApiKey.value || '' })
+    toast.success('Konfigurasi 9router disimpan!')
+  } catch { toast.error('Gagal menyimpan') }
+  finally { savingNrKey.value = false }
 }
 
-async function loadORModels() {
-  loadingOR.value = true
+async function testApiKey(provider = 'openrouter') {
+  if (provider === '9router') {
+    testingNrKey.value = true
+    testNrResult.value = null
+  } else {
+    testingKey.value = true
+    testResult.value = null
+  }
   try {
-    const { data } = await api.get('/config/openrouter-models')
+    const { data } = await api.get(`/config/test-api-key?provider=${provider}`)
+    if (provider === '9router') testNrResult.value = data
+    else testResult.value = data
+  } catch (err) {
+    const result = { success: false, message: err.response?.data?.message || 'Koneksi gagal' }
+    if (provider === '9router') testNrResult.value = result
+    else testResult.value = result
+  } finally {
+    testingKey.value = false
+    testingNrKey.value = false
+  }
+}
+
+async function loadRemoteModels() {
+  loadingOR.value = true
+  orModels.value = []
+  try {
+    const { data } = await api.get(`/config/remote-models?provider=${browseProvider.value}`)
     orModels.value = data.data
-  } catch { toast.error('Pastikan API key sudah disimpan') }
+  } catch { toast.error('Pastikan API key / koneksi provider sudah dikonfigurasi') }
   finally { loadingOR.value = false }
 }
 
 function openModelForm(m = null) {
   editModelId.value = m?.id || null
-  modelForm.value = m ? { name: m.name, model_id: m.model_id, max_tokens: m.max_tokens, temperature: m.temperature, notes: m.notes || '' } : { name: '', model_id: '', max_tokens: 4096, temperature: 0.7, notes: '' }
+  modelForm.value = m
+    ? { name: m.name, provider: m.provider || 'openrouter', model_id: m.model_id, max_tokens: m.max_tokens, temperature: m.temperature, notes: m.notes || '' }
+    : { name: '', provider: 'openrouter', model_id: '', max_tokens: 4096, temperature: 0.7, notes: '' }
   showModelForm.value = true
 }
 
 function quickAddModel(m) {
-  modelForm.value = { name: m.name, model_id: m.id, max_tokens: 4096, temperature: 0.7, notes: m.is_free ? 'Model gratis' : '' }
+  modelForm.value = { name: m.name, provider: browseProvider.value, model_id: m.id, max_tokens: 4096, temperature: 0.7, notes: m.is_free ? 'Model gratis' : '' }
   editModelId.value = null
   showModelForm.value = true
 }

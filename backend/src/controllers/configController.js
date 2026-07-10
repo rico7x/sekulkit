@@ -1,13 +1,98 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/init.js';
 
+/**
+ * Resolve provider-specific configuration for a user.
+ * Falls back to env vars when per-user config not set.
+ */
+function resolveProviderConfig(provider, userId) {
+  const isOpenRouter = provider === 'openrouter';
+  const baseUrl = isOpenRouter
+    ? process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
+    : process.env.NINEROUTER_BASE_URL || 'http://localhost:20128/v1';
+
+  const configKey = isOpenRouter ? 'openrouter_api_key' : 'ninerouter_api_key';
+  const envFallbackKey = isOpenRouter ? 'OPENROUTER_API_KEY' : 'NINEROUTER_API_KEY';
+
+  const configRow = db.prepare('SELECT value FROM app_config WHERE user_id = ? AND key = ?')
+    .get(userId, configKey);
+  const apiKey = configRow?.value || process.env[envFallbackKey] || '';
+
+  const extraHeaders = isOpenRouter
+    ? { 'HTTP-Referer': 'https://sekulkit.app', 'X-Title': 'SekulKit' }
+    : {};
+
+  return { baseUrl, apiKey, extraHeaders };
+}
+
+/**
+ * Test connection to a provider using its /models endpoint.
+ */
+async function testProviderConnection(provider, userId) {
+  const { baseUrl, apiKey, extraHeaders } = resolveProviderConfig(provider, userId);
+
+  if (!apiKey && provider === '9router') {
+    // 9router local sering no-auth — allow empty key
+  } else if (!apiKey) {
+    return { success: false, message: `API Key ${provider} belum dikonfigurasi` };
+  }
+
+  try {
+    const r = await fetch(`${baseUrl}/models`, {
+      headers: { 'Authorization': `Bearer ${apiKey}`, ...extraHeaders }
+    });
+    if (!r.ok) throw new Error(`Status ${r.status}`);
+    const data = await r.json();
+    return { success: true, message: `${provider} API Key valid`, model_count: data.data?.length || 0 };
+  } catch (err) {
+    return { success: false, message: `${provider} API Key tidak valid: ${err.message}` };
+  }
+}
+
+/**
+ * Fetch remote model list from provider, normalized to common shape.
+ */
+async function fetchRemoteModels(provider, userId) {
+  const { baseUrl, apiKey, extraHeaders } = resolveProviderConfig(provider, userId);
+
+  if (!apiKey && provider === '9router') {
+    // allow no-auth
+  } else if (!apiKey) {
+    throw new Error(`API Key ${provider} belum dikonfigurasi`);
+  }
+
+  const r = await fetch(`${baseUrl}/models`, {
+    headers: { 'Authorization': `Bearer ${apiKey}`, ...extraHeaders }
+  });
+  if (!r.ok) throw new Error(`Status ${r.status}`);
+  const data = await r.json();
+
+  // Normalize: provider responses may differ slightly
+  const rawModels = data.data || [];
+  const models = rawModels.map(m => {
+    // OpenRouter has `pricing.prompt === '0'` for free
+    // 9router / OpenAI-compatible may not have pricing — treat all as potentially free
+    const isFree = m.pricing?.prompt === '0' || !m.pricing;
+    return {
+      id: m.id,
+      name: m.name,
+      context_length: m.context_length,
+      is_free: isFree,
+      pricing: m.pricing
+    };
+  }).sort((a, b) => (b.is_free ? 1 : 0) - (a.is_free ? 1 : 0));
+
+  return models;
+}
+
+export { resolveProviderConfig };
+
 export const configController = {
   // APP CONFIG (key-value store per user)
   getConfig(req, res) {
     const configs = db.prepare('SELECT key, value FROM app_config WHERE user_id = ?').all(req.user.id);
     const result = {};
     configs.forEach(c => {
-      // Mask API key
       result[c.key] = c.key.includes('api_key') ? '***' + c.value.slice(-4) : c.value;
     });
     res.json({ data: result });
@@ -37,7 +122,6 @@ export const configController = {
     if (!name || !model_id) return res.status(400).json({ message: 'Name dan model_id wajib diisi' });
 
     const id = uuidv4();
-    // Set as default if first model
     const count = db.prepare('SELECT COUNT(*) as c FROM ai_models WHERE user_id = ?').get(req.user.id).c;
     const is_default = count === 0 ? 1 : 0;
 
@@ -53,9 +137,17 @@ export const configController = {
     const model = db.prepare('SELECT id FROM ai_models WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!model) return res.status(404).json({ message: 'Model tidak ditemukan' });
 
-    const { name, model_id, max_tokens, temperature, notes } = req.body;
-    db.prepare(`UPDATE ai_models SET name=?, model_id=?, max_tokens=?, temperature=?, notes=? WHERE id=?`)
-      .run(name, model_id, max_tokens, temperature, notes, req.params.id);
+    const { name, model_id, provider, max_tokens, temperature, notes } = req.body;
+    // provider optional update (defaults to existing if not sent)
+    const updateFields = ['name=?', 'model_id=?', 'max_tokens=?', 'temperature=?', 'notes=?'];
+    const updateValues = [name, model_id, max_tokens, temperature, notes];
+    if (provider) {
+      updateFields.push('provider=?');
+      updateValues.push(provider);
+    }
+    updateValues.push(req.params.id);
+
+    db.prepare(`UPDATE ai_models SET ${updateFields.join(', ')} WHERE id=?`).run(...updateValues);
 
     res.json({ data: db.prepare('SELECT * FROM ai_models WHERE id = ?').get(req.params.id) });
   },
@@ -107,46 +199,34 @@ export const configController = {
     res.json({ message: 'Template dihapus' });
   },
 
-  // Test koneksi OpenRouter
+  // Provider-aware connection test
   async testApiKey(req, res) {
-    const apiKeyConfig = db.prepare("SELECT value FROM app_config WHERE user_id = ? AND key = 'openrouter_api_key'").get(req.user.id);
-    if (!apiKeyConfig) return res.status(400).json({ message: 'API Key belum dikonfigurasi' });
+    const provider = req.query.provider || 'openrouter';
+    const result = await testProviderConnection(provider, req.user.id);
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
+  },
 
+  // Provider-aware remote model listing
+  async getOpenRouterModels(req, res) {
+    const provider = req.query.provider || 'openrouter';
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: { 'Authorization': `Bearer ${apiKeyConfig.value}` }
-      });
-      if (!r.ok) throw new Error(`Status ${r.status}`);
-      const data = await r.json();
-      res.json({ success: true, message: 'API Key valid', model_count: data.data?.length || 0 });
+      const models = await fetchRemoteModels(provider, req.user.id);
+      res.json({ data: models });
     } catch (err) {
-      res.status(400).json({ success: false, message: `API Key tidak valid: ${err.message}` });
+      res.status(500).json({ message: `Gagal mengambil daftar model ${provider}: ${err.message}` });
     }
   },
 
-  // Ambil daftar model gratis dari OpenRouter
-  async getOpenRouterModels(req, res) {
-    const apiKeyConfig = db.prepare("SELECT value FROM app_config WHERE user_id = ? AND key = 'openrouter_api_key'").get(req.user.id);
-    if (!apiKeyConfig) return res.status(400).json({ message: 'API Key belum dikonfigurasi' });
-
+  // Alias for backward compatibility
+  async getRemoteModels(req, res) {
+    // same handler, just a nicer route name
+    const provider = req.query.provider || 'openrouter';
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: { 'Authorization': `Bearer ${apiKeyConfig.value}` }
-      });
-      const data = await r.json();
-
-      // Filter & map model
-      const models = (data.data || []).map(m => ({
-        id: m.id,
-        name: m.name,
-        context_length: m.context_length,
-        is_free: m.pricing?.prompt === '0',
-        pricing: m.pricing
-      })).sort((a, b) => (b.is_free ? 1 : 0) - (a.is_free ? 1 : 0));
-
+      const models = await fetchRemoteModels(provider, req.user.id);
       res.json({ data: models });
     } catch (err) {
-      res.status(500).json({ message: 'Gagal mengambil daftar model' });
+      res.status(500).json({ message: `Gagal mengambil daftar model ${provider}: ${err.message}` });
     }
   }
 };

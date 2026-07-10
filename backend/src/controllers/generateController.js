@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/init.js';
 import { shouldGenerateImage } from '../utils/imageGen.js';
+import { resolveProviderConfig } from './configController.js';
 
 // =====================
 // PROMPT BUILDER
@@ -103,8 +104,11 @@ export const generateController = {
     const modelConfig = db.prepare('SELECT * FROM ai_models WHERE id = ? AND user_id = ?').get(model_id, req.user.id);
     if (!modelConfig) return res.status(404).json({ message: 'Model AI tidak ditemukan' });
 
-    const apiKeyConfig = db.prepare("SELECT value FROM app_config WHERE user_id = ? AND key = 'openrouter_api_key'").get(req.user.id);
-    if (!apiKeyConfig) return res.status(400).json({ message: 'API Key OpenRouter belum dikonfigurasi' });
+    const provider = modelConfig.provider || 'openrouter';
+    const { baseUrl, apiKey: providerApiKey, extraHeaders } = resolveProviderConfig(provider, req.user.id);
+    if (!providerApiKey && provider !== '9router') {
+      return res.status(400).json({ message: `API Key ${provider} belum dikonfigurasi` });
+    }
 
     const historyId = uuidv4();
     db.prepare(`
@@ -135,13 +139,12 @@ export const generateController = {
     try {
       sendEvent('status', { message: 'Menghubungi AI...' });
 
-      const aiResponse = await fetch(`${process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'}/chat/completions`, {
+      const aiResponse = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKeyConfig.value}`,
-          'HTTP-Referer': 'https://sekulkit.app',
-          'X-Title': 'SekulKit'
+          'Authorization': `Bearer ${providerApiKey}`,
+          ...extraHeaders
         },
         body: JSON.stringify({
           model: modelConfig.model_id,
@@ -154,7 +157,7 @@ export const generateController = {
 
       if (!aiResponse.ok) {
         const errText = await aiResponse.text();
-        throw new Error(`OpenRouter error: ${aiResponse.status} - ${errText}`);
+        throw new Error(`${provider} error: ${aiResponse.status} - ${errText}`);
       }
 
       sendEvent('status', { message: 'Menerima respons AI...' });
