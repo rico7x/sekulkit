@@ -9,7 +9,8 @@ import { resolveProviderConfig } from './configController.js';
 function buildPrompt(config) {
   const {
     mata_pelajaran, bab, materi, jenis_soal, jumlah, tingkat_kesulitan,
-    jumlah_opsi, generate_pembahasan, kelas, jenjang, bahasa = 'Indonesia'
+    jumlah_opsi, generate_pembahasan, kelas, jenjang, bahasa = 'Indonesia',
+    custom_prompt
   } = config;
 
   const jenisLabel = {
@@ -46,6 +47,10 @@ function buildPrompt(config) {
     formatPetunjuk = `Buat ${jumlah} pasang item (kolom A dan kolom B) yang harus dijodohkan.`;
   }
 
+  const customBlock = custom_prompt && String(custom_prompt).trim()
+    ? `\nINSTRUKSI KHUSUS DARI GURU (WAJIB DIPATUHI, prioritas tertinggi selama tidak melanggar format output):\n${String(custom_prompt).trim()}\n`
+    : '';
+
   return `Kamu adalah guru berpengalaman yang ahli membuat soal berkualitas tinggi.
 
 KONTEKS SOAL:
@@ -55,7 +60,7 @@ TUGAS:
 Buat ${jumlah} soal jenis ${jenisLabel[jenis_soal] || jenis_soal} dengan ${difficultyDesc[tingkat_kesulitan] || 'tingkat sedang'}.
 ${formatPetunjuk}
 ${generate_pembahasan ? 'Sertakan pembahasan singkat dan jelas untuk setiap soal.' : 'Jangan sertakan pembahasan.'}
-
+${customBlock}
 ATURAN PENTING:
 - Soal harus kontekstual, relevan, dan tidak ambigu
 - Bahasa yang digunakan: Bahasa ${bahasa}
@@ -91,7 +96,7 @@ export const generateController = {
       bank_soal_id, bab, materi, jenis_soal, jumlah = 5,
       tingkat_kesulitan = 'sedang', jumlah_opsi = 4,
       generate_pembahasan = false, model_id, mata_pelajaran,
-      kelas, jenjang
+      kelas, jenjang, custom_prompt
     } = req.body;
 
     if (!bank_soal_id || !bab || !materi || !jenis_soal || !model_id) {
@@ -115,13 +120,14 @@ export const generateController = {
       INSERT INTO generate_history (id, user_id, bank_soal_id, model_id, model_name, total_soal_diminta, status, config_snapshot)
       VALUES (?, ?, ?, ?, ?, ?, 'processing', ?)
     `).run(historyId, req.user.id, bank_soal_id, model_id, modelConfig.name, jumlah,
-      JSON.stringify({ bab, materi, jenis_soal, jumlah, tingkat_kesulitan }));
+      JSON.stringify({ bab, materi, jenis_soal, jumlah, tingkat_kesulitan, custom_prompt: custom_prompt || null }));
 
     const resolvedMapel = mata_pelajaran || bank.mata_pelajaran;
     const prompt = buildPrompt({
       mata_pelajaran: resolvedMapel,
       bab, materi, jenis_soal, jumlah, tingkat_kesulitan, jumlah_opsi,
-      generate_pembahasan, kelas: kelas || bank.kelas, jenjang: jenjang || bank.jenjang
+      generate_pembahasan, kelas: kelas || bank.kelas, jenjang: jenjang || bank.jenjang,
+      custom_prompt
     });
 
     // Setup SSE

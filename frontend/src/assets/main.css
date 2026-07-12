@@ -5,7 +5,7 @@
 @layer base {
   * { @apply box-border; }
   body {
-    @apply bg-slate-50 text-slate-800 font-sans antialiased;
+    @apply text-slate-800 font-sans antialiased;
   }
   ::-webkit-scrollbar { @apply w-1.5 h-1.5; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
@@ -14,14 +14,23 @@
 }
 
 @layer components {
+  /* App background — tinted gradient so white cards stand out */
+  .app-shell {
+    background-color: #e8ecfa;
+    background-image:
+      radial-gradient(1100px 560px at -8% -18%, rgba(99, 102, 241, 0.14), transparent 60%),
+      radial-gradient(950px 520px at 112% -12%, rgba(6, 182, 212, 0.12), transparent 55%),
+      radial-gradient(900px 700px at 50% 120%, rgba(79, 70, 229, 0.08), transparent 60%);
+  }
   /* Buttons */
   .btn {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
     transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800
-    shadow-sm shadow-primary-200;
+    @apply btn text-white bg-gradient-to-br from-primary-500 to-primary-700
+    hover:from-primary-600 hover:to-primary-800 active:from-primary-700 active:to-primary-900
+    shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/30;
   }
   .btn-secondary {
     @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50
@@ -57,9 +66,10 @@
 
   /* Inputs */
   .input {
-    @apply w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm
-    focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400
-    placeholder:text-slate-400 transition-all duration-150 disabled:bg-slate-50 disabled:text-slate-500;
+    @apply w-full px-3 py-2 rounded-lg border border-slate-300 bg-slate-50/70 text-sm
+    focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 focus:bg-white
+    hover:border-slate-400 placeholder:text-slate-400 transition-all duration-150
+    disabled:bg-slate-100 disabled:text-slate-500;
   }
   .input-error { @apply border-red-400 focus:ring-red-400/30 focus:border-red-400; }
   .label { @apply block text-sm font-medium text-slate-700 mb-1.5; }
@@ -67,10 +77,12 @@
 
   /* Cards */
   .card {
-    @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+    @apply bg-white rounded-2xl border border-slate-200/70 overflow-hidden
+    shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_30px_-16px_rgba(51,65,110,0.28)];
   }
   .card-header {
-    @apply px-5 py-4 border-b border-slate-100 flex items-center justify-between;
+    @apply px-5 py-4 border-b border-slate-100 flex items-center justify-between
+    bg-gradient-to-r from-slate-50 via-white to-white;
   }
   .card-body { @apply p-5; }
 
@@ -94,11 +106,16 @@
 
   /* Sidebar */
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+    @apply relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
     text-slate-600 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150;
   }
   .sidebar-link.active {
-    @apply bg-primary-50 text-primary-700;
+    @apply bg-gradient-to-r from-primary-50 to-primary-100/40 text-primary-700 font-semibold
+    shadow-sm shadow-primary-100;
+  }
+  .sidebar-link.active::before {
+    content: '';
+    @apply absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-primary-600;
   }
 
   /* Table */
@@ -115,8 +132,9 @@
 
   /* AI streaming text */
   .streaming-text {
-    @apply font-mono text-sm text-slate-600 bg-slate-50 rounded-lg p-4
-    border border-slate-200 max-h-48 overflow-y-auto whitespace-pre-wrap;
+    @apply font-mono text-sm text-slate-300 bg-slate-900 rounded-lg p-4
+    border border-slate-700 max-h-48 overflow-y-auto whitespace-pre-wrap
+    shadow-inner;
   }
 }
 

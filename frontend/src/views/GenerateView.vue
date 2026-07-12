@@ -1,13 +1,22 @@
 <template>
-  <div class="p-6 max-w-4xl mx-auto">
-    <div class="mb-6">
-      <h2 class="text-xl font-bold text-slate-900">Generate Soal dengan AI</h2>
-      <p class="text-slate-500 text-sm mt-1">Isi data di bawah, lalu AI akan membuatkan soal untuk Anda</p>
+  <div class="p-6 max-w-7xl mx-auto">
+    <!-- Header banner -->
+    <div class="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-600 via-primary-600 to-indigo-800 shadow-lg shadow-primary-500/25">
+      <div class="relative px-6 py-5 flex items-center gap-4">
+        <div class="absolute inset-0 opacity-20 bg-[radial-gradient(500px_180px_at_90%_-40%,white,transparent)]"></div>
+        <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center flex-shrink-0 ring-1 ring-white/25">
+          <Sparkles class="w-6 h-6 text-white" />
+        </div>
+        <div class="relative">
+          <h2 class="text-xl font-bold text-white">Generate Soal dengan AI</h2>
+          <p class="text-primary-100 text-sm mt-0.5">Isi data di bawah, lalu AI akan membuatkan soal berkualitas untuk Anda</p>
+        </div>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- Form panel -->
-      <div class="lg:col-span-2 space-y-4">
+      <div class="lg:col-span-8 space-y-5">
 
         <!-- Bank Soal -->
         <div class="card">
@@ -97,6 +106,20 @@
                 <p class="text-xs text-slate-500">AI menyertakan penjelasan jawaban (lebih banyak token)</p>
               </div>
             </label>
+
+            <!-- Custom Prompt -->
+            <div class="form-group">
+              <label class="label flex items-center gap-1.5">
+                <MessageSquarePlus class="w-4 h-4 text-primary-500" /> Instruksi Khusus (Custom Prompt)
+                <span class="text-xs font-normal text-slate-400">— opsional</span>
+              </label>
+              <textarea v-model="form.custom_prompt" rows="3" maxlength="1000" class="input resize-y"
+                placeholder="cth: Fokuskan soal pada studi kasus kehidupan sehari-hari, gunakan nama tokoh Indonesia, hindari angka desimal."></textarea>
+              <p class="text-xs text-slate-400 mt-1">
+                Instruksi tambahan khusus untuk generate ini saja (tidak tersimpan sebagai pengaturan global).
+                <span class="text-slate-300">{{ (form.custom_prompt || '').length }}/1000</span>
+              </p>
+            </div>
           </div>
         </div>
 
@@ -148,7 +171,7 @@
       </div>
 
       <!-- Right: Status & Tips -->
-      <div class="space-y-4">
+      <div class="lg:col-span-4 space-y-4 lg:sticky lg:top-6">
         <!-- Status panel -->
         <div class="card">
           <div class="card-header">
@@ -256,7 +279,7 @@ import { useToast } from 'vue-toastification'
 import {
   Library, Plus, SlidersHorizontal, BookOpenCheck, BrainCircuit,
   Settings, Sparkles, Loader2, CheckCircle, Clock, ArrowRight,
-  AlertCircle, Lightbulb
+  AlertCircle, Lightbulb, MessageSquarePlus
 } from 'lucide-vue-next'
 import { useBankSoalStore } from '../stores/bankSoal.js'
 import api from '../utils/api.js'
@@ -278,7 +301,7 @@ const form = ref({
   bank_soal_id: '', bab: '', materi: '',
   jenis_soal: 'pg', jumlah: 10,
   tingkat_kesulitan: 'sedang', jumlah_opsi: 4,
-  generate_pembahasan: false, model_id: ''
+  generate_pembahasan: false, model_id: '', custom_prompt: ''
 })
 const newBank = ref({ nama: '', mata_pelajaran: '', jenjang: '', kelas: '' })
 
