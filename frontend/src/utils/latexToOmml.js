@@ -12,6 +12,26 @@ const mml2omml =
   : null
 
 /**
+ * Bangun ImportedXmlComponent dari sebuah DOM Element (rekursif).
+ * Setara `convertToXmlComponent` internal docx, tapi kita mulai dari
+ * elemen <m:oMath> yang sebenarnya — bukan root dokumen (yang tak bernama
+ * dan menghasilkan wrapper <undefined> yang ditolak Word).
+ */
+function domToXmlComponent(node) {
+  const attrs = {}
+  for (const a of Array.from(node.attributes || [])) attrs[a.name] = a.value
+  const comp = new ImportedXmlComponent(node.tagName, Object.keys(attrs).length ? attrs : undefined)
+  for (const child of Array.from(node.childNodes)) {
+    if (child.nodeType === 1) {          // element
+      comp.push(domToXmlComponent(child))
+    } else if (child.nodeType === 3) {   // text
+      if (child.textContent) comp.push(child.textContent)
+    }
+  }
+  return comp
+}
+
+/**
  * LaTeX -> elemen docx (ImportedXmlComponent membungkus <m:oMath>), atau null bila gagal.
  * Aman dipakai sebagai child Paragraph, sama slot dengan TextRun.
  */
@@ -28,7 +48,11 @@ export function latexToOmmlElement(latex, display = false) {
     if (omml.indexOf('xmlns:m=') === -1) {
       omml = omml.replace('<m:oMath', `<m:oMath xmlns:m="${M_NS}"`)
     }
-    return ImportedXmlComponent.fromXmlString(omml)
+    const dom = new DOMParser().parseFromString(omml, 'application/xml')
+    if (dom.getElementsByTagName('parsererror').length) return null
+    const root = dom.documentElement // <m:oMath>
+    if (!root || root.tagName !== 'm:oMath') return null
+    return domToXmlComponent(root)
   } catch (e) {
     console.warn('OMML convert gagal:', latex, e)
     return null
