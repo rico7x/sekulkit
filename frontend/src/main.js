@@ -5,8 +5,12 @@ import 'vue-toastification/dist/index.css'
 import App from './App.vue'
 import router from './router/index.js'
 import './assets/main.css'
+import 'katex/dist/katex.min.css'
+import { richDirective } from './directives/rich.js'
 
 const app = createApp(App)
+
+app.directive('rich', richDirective)
 
 app.use(createPinia())
 app.use(router)

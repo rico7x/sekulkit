@@ -119,7 +119,7 @@
 
                 <!-- Konten soal -->
                 <div class="flex-1 min-w-0">
-                  <div class="text-sm text-slate-800 mb-2 leading-relaxed soal-content" v-html="soal.pertanyaan"></div>
+                  <div class="text-sm text-slate-800 mb-2 leading-relaxed soal-content" v-rich="soal.pertanyaan"></div>
 
                   <!-- Opsi PG/PGK -->
                   <div v-if="soal.opsi?.length && ['pg', 'pgk', 'benar_salah'].includes(soal.jenis)"
@@ -128,7 +128,7 @@
                       class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
                       :class="opsi.is_benar ? 'bg-emerald-50 text-emerald-700 font-medium' : 'bg-slate-50 text-slate-600'">
                       <span class="font-bold w-4 flex-shrink-0">{{ opsi.label }}.</span>
-                      <span class="flex-1 soal-content" v-html="opsi.teks"></span>
+                      <span class="flex-1 soal-content" v-rich="opsi.teks"></span>
                       <CheckCircle v-if="opsi.is_benar" class="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" />
                     </div>
                   </div>
@@ -137,14 +137,14 @@
                   <div v-if="soal.opsi?.length && soal.jenis === 'isian'"
                     class="mt-2 text-xs bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                     <Key class="w-3.5 h-3.5 flex-shrink-0" />
-                    <span><strong>Kunci:</strong> <span class="soal-content" v-html="soal.opsi[0]?.teks"></span></span>
+                    <span><strong>Kunci:</strong> <span class="soal-content" v-rich="soal.opsi[0]?.teks"></span></span>
                   </div>
 
                   <!-- Pembahasan -->
                   <div v-if="soal.pembahasan"
                     class="mt-2 text-xs bg-amber-50 text-amber-800 px-3 py-1.5 rounded-lg border border-amber-100 flex items-start gap-1.5">
                     <Lightbulb class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span class="soal-content" v-html="soal.pembahasan"></span>
+                    <span class="soal-content" v-rich="soal.pembahasan"></span>
                   </div>
                 </div>
               </div>

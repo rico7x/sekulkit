@@ -180,14 +180,14 @@
               <div v-for="(soal, idx) in filteredSoal" :key="soal.id">
                 <div class="font-medium leading-relaxed soal-content">
                   <span class="font-bold">{{ layout.startNumber + idx }}.</span>
-                  <span v-html="soal.pertanyaan"></span>
+                  <span v-rich="soal.pertanyaan"></span>
                 </div>
 
                 <div v-if="soal.opsi?.length && ['pg','pgk'].includes(soal.jenis)" class="mt-1.5 ml-5 space-y-0.5">
                   <p v-for="opsi in soal.opsi" :key="opsi.id"
                     :class="layout.showKunci && opsi.is_benar ? 'text-emerald-700 font-semibold' : 'text-slate-700'">
                     <span class="font-bold">{{ opsi.label }}.</span>
-                    <span class="soal-content" v-html="opsi.teks"></span>
+                    <span class="soal-content" v-rich="opsi.teks"></span>
                     <CheckCircle v-if="layout.showKunci && opsi.is_benar" class="inline w-3.5 h-3.5 ml-1 text-emerald-500" />
                   </p>
                 </div>
@@ -205,7 +205,7 @@
                 <div v-if="layout.showPembahasan && soal.pembahasan"
                   class="mt-1.5 ml-5 text-xs text-slate-500 bg-amber-50 p-2 rounded border-l-2 border-amber-300">
                   <strong>Pembahasan:</strong>
-                  <span class="soal-content" v-html="soal.pembahasan"></span>
+                  <span class="soal-content" v-rich="soal.pembahasan"></span>
                 </div>
               </div>
             </div>

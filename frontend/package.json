@@ -1,6 +1,6 @@
 {
   "name": "sekulkit-frontend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,8 +22,11 @@
     "axios": "^1.6.8",
     "docx": "^8.5.0",
     "file-saver": "^2.0.5",
+    "katex": "^0.17.0",
     "lucide-vue-next": "^0.395.0",
+    "mathml2omml": "^0.5.0",
     "pinia": "^2.1.7",
+    "temml": "^0.13.3",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
     "vue-toastification": "^2.0.0-rc.5"

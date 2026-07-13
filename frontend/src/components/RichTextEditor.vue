@@ -95,6 +95,11 @@
           <Loader2 v-if="uploading" class="w-4 h-4 animate-spin" />
           <ImageIcon v-else class="w-4 h-4" />
         </button>
+        <button type="button" @click="showMathInput = !showMathInput"
+          :class="{ 'is-active': showMathInput }"
+          class="toolbar-btn" title="Sisipkan Rumus (LaTeX)">
+          <Sigma class="w-4 h-4" />
+        </button>
         <button type="button" @click="editor.chain().focus().setHorizontalRule().run()"
           class="toolbar-btn" title="Horizontal Rule">
           <Minus class="w-4 h-4" />
@@ -155,6 +160,30 @@
       </div>
     </Transition>
 
+    <!-- Math input bar -->
+    <Transition name="slide">
+      <div v-if="showMathInput && editor" class="rich-editor__image-input">
+        <div class="flex items-center gap-2">
+          <input v-model="mathInput" type="text" class="input text-xs flex-1 font-mono"
+            placeholder="LaTeX, mis. \frac{a}{b} atau x^2"
+            @keydown.enter.prevent="insertMath" />
+          <label class="flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap select-none">
+            <input type="checkbox" v-model="mathDisplay" /> Blok
+          </label>
+          <button type="button" @click="insertMath" class="btn-primary btn-sm whitespace-nowrap"
+            :disabled="!mathInput.trim()">
+            <Sigma class="w-3.5 h-3.5" /> Sisipkan
+          </button>
+        </div>
+        <div class="mt-2 px-2 py-1 bg-white rounded border border-slate-200 text-sm min-h-[2rem]"
+          v-html="mathPreview"></div>
+        <button type="button" @click="showMathInput = false; mathInput = ''"
+          class="absolute top-2 right-2 text-slate-400 hover:text-slate-600">
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+    </Transition>
+
     <!-- Editor content -->
     <editor-content :editor="editor" class="rich-editor__content" />
 
@@ -180,9 +209,10 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, AlignLeft, AlignCenter, AlignRight,
   ImageIcon, Minus, CornerDownLeft, Undo2, Redo2, X,
-  Loader2
+  Loader2, Sigma
 } from 'lucide-vue-next'
 import api from '../utils/api.js'
+import katex from 'katex'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -195,6 +225,30 @@ const showImageInput = ref(false)
 const imageUrl = ref('')
 const isFocused = ref(false)
 const uploading = ref(false)
+
+const showMathInput = ref(false)
+const mathInput = ref('')
+const mathDisplay = ref(false)
+
+const mathPreview = computed(() => {
+  if (!mathInput.value.trim()) return '<span class="text-slate-400 text-xs">Pratinjau rumus…</span>'
+  try {
+    return katex.renderToString(mathInput.value, {
+      displayMode: mathDisplay.value, throwOnError: false, errorColor: '#dc2626',
+    })
+  } catch {
+    return '<span class="text-red-500 text-xs">LaTeX tidak valid</span>'
+  }
+})
+
+function insertMath() {
+  const t = mathInput.value.trim()
+  if (!t || !editor.value) return
+  const wrapped = mathDisplay.value ? `$$${t}$$` : `$${t}$`
+  editor.value.chain().focus().insertContent(wrapped).run()
+  mathInput.value = ''
+  showMathInput.value = false
+}
 
 /**
  * Upload file ke server → return URL

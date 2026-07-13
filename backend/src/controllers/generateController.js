@@ -67,6 +67,7 @@ ATURAN PENTING:
 - Hindari soal yang trivial atau terlalu mudah ditebak
 - Untuk PG/PGK: pastikan semua pengecoh (distraktor) masuk akal
 - Variasikan bentuk pertanyaan agar tidak monoton
+- Untuk rumus matematika/fisika/kimia atau notasi ilmiah, TULIS dengan sintaks LaTeX: gunakan $...$ untuk rumus inline dan $$...$$ untuk rumus blok. Contoh inline: "Akar dari $x^2+3x-4=0$ adalah ...". Contoh blok: "$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$". Gunakan LaTeX HANYA bila materi memang memuat rumus/simbol matematis; untuk mata pelajaran non-eksakta tulis teks biasa tanpa tanda $.
 
 
 FORMAT OUTPUT (wajib JSON murni, tidak ada teks di luar JSON):

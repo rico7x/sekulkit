@@ -1,4 +1,5 @@
 import { Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType } from 'docx'
+import { tokenizeMath, latexToOmmlElement } from './latexToOmml.js'
 
 /**
  * Fetch image URL → ArrayBuffer
@@ -39,7 +40,20 @@ function dataUriToBuffer(dataUri) {
 async function inlineToRuns(node) {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent
-    return text ? [new TextRun({ text })] : []
+    if (!text) return []
+    const toks = tokenizeMath(text)
+    if (toks.length === 1 && toks[0].type === 'text') return [new TextRun({ text })]
+    const out = []
+    for (const t of toks) {
+      if (t.type === 'text') {
+        if (t.value) out.push(new TextRun({ text: t.value }))
+      } else {
+        const el = latexToOmmlElement(t.latex, t.display)
+        const d = t.display ? '$$' : '$'
+        out.push(el || new TextRun({ text: d + t.latex + d })) // fallback teks bila gagal
+      }
+    }
+    return out
   }
 
   if (node.nodeType !== Node.ELEMENT_NODE) return []
