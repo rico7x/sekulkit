@@ -169,12 +169,12 @@ async function blockToStructures(el) {
     return [{ runs: [new TextRun({ text, font: { name: 'Consolas' }, size: 18 })], options: { indent: { left: 360 } } }]
   }
 
-  // Recurse
+  // Recurse — proses text node lewat inlineToRuns agar tokenizeMath aktif
   const items = []
   for (const child of el.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
-      const text = child.textContent.trim()
-      if (text) items.push({ runs: [new TextRun({ text })], options: {} })
+      const runs = await inlineToRuns(child)
+      if (runs.length > 0) items.push({ runs, options: {} })
     } else if (child.nodeType === Node.ELEMENT_NODE) {
       items.push(...await blockToStructures(child))
     }
@@ -196,8 +196,9 @@ export async function htmlToDocxStructures(html) {
   const structures = []
   for (const child of body.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
-      const text = child.textContent.trim()
-      if (text) structures.push({ runs: [new TextRun({ text })], options: {} })
+      // Proses lewat inlineToRuns agar tokenizeMath bisa mendeteksi $...$
+      const runs = await inlineToRuns(child)
+      if (runs.length > 0) structures.push({ runs, options: {} })
     } else if (child.nodeType === Node.ELEMENT_NODE) {
       structures.push(...await blockToStructures(child))
     }

@@ -150,3 +150,43 @@
 
 /* Toast override */
 .Vue-Toastification__toast { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+
+/* ── Print styles ── */
+@media print {
+  @page {
+    margin: 15mm;
+    size: A4;
+  }
+
+  /* App layout: reset to block flow */
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Hide app sidebar */
+  .app-shell > aside {
+    display: none !important;
+  }
+
+  /* Hide app top header */
+  .app-shell > div > header {
+    display: none !important;
+  }
+
+  /* Hide main overflow constraint */
+  .app-shell > div > main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Hide export header bar (back btn, format selector, export buttons) */
+  #preview-area {
+    scrollbar-width: none;
+  }
+  #preview-area::-webkit-scrollbar {
+    display: none !important;
+  }
+}

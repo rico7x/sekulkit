@@ -361,4 +361,52 @@ onMounted(async () => {
 .soal-content :deep(ul), .soal-content :deep(ol) {
   @apply pl-5 my-0.5;
 }
+
+/* ── Print: hanya tampilkan preview area ── */
+@media print {
+  /* Root: full width, no height constraint */
+  & {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* Sembunyikan export header bar */
+  & > div:first-child {
+    display: none !important;
+  }
+
+  /* Main area: full width, no padding/gap */
+  & > .flex-1 {
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  /* Sembunyikan settings sidebar */
+  aside {
+    display: none !important;
+  }
+
+  /* Preview card: full width, no decoration */
+  & > .flex-1 > .card {
+    border: none !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+  }
+
+  /* Sembunyikan preview card header */
+  & > .flex-1 > .card > .card-header {
+    display: none !important;
+  }
+
+  /* Preview area: full width, no shadow/border, no scroll */
+  #preview-area {
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  #preview-area::-webkit-scrollbar { display: none !important; }
+}
 </style>
