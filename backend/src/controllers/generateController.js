@@ -1,7 +1,19 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/init.js';
-import { shouldGenerateImage } from '../utils/imageGen.js';
+import { shouldGenerateImage, generateImageBuffer, saveGeneratedImage, refineImagePrompt, buildImagePrompt } from '../utils/imageGen.js';
 import { resolveProviderConfig } from './configController.js';
+
+// Jalankan worker secara paralel dengan batas concurrency
+async function runWithConcurrency(jobs, limit, worker) {
+  let index = 0;
+  const runners = Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (index < jobs.length) {
+      const job = jobs[index++];
+      await worker(job);
+    }
+  });
+  await Promise.all(runners);
+}
 
 // =====================
 // PROMPT BUILDER
@@ -82,7 +94,7 @@ FORMAT OUTPUT (wajib JSON murni, tidak ada teks di luar JSON):
       ${jenis_soal === 'isian' || jenis_soal === 'essay' ? `"kunci_jawaban": "jawaban yang benar",` : ''}
       ${generate_pembahasan ? `"pembahasan": "penjelasan jawaban",` : `"pembahasan": null,`}
       "need_image": true atau false,
-      "image_prompt": "deskripsi gambar dalam bahasa Inggris jika need_image true, kosong jika false"
+      "image_prompt": "deskripsi gambar jika need_image true, kosong jika false. Struktur deskripsi bebas (disarankan bahasa Inggris agar image model akurat), TAPI semua label/teks yang akan muncul DI DALAM gambar WAJIB ditulis verbatim dalam bahasa ${bahasa}, contoh: labeled \"Ketinggian 4,0 cm\""
     }
   ]
 }`;
@@ -96,7 +108,7 @@ export const generateController = {
     const {
       bank_soal_id, bab, materi, jenis_soal, jumlah = 5,
       tingkat_kesulitan = 'sedang', jumlah_opsi = 4,
-      generate_pembahasan = false, model_id, mata_pelajaran,
+      generate_pembahasan = false, model_id, image_model_id, mata_pelajaran,
       kelas, jenjang, custom_prompt
     } = req.body;
 
@@ -109,6 +121,13 @@ export const generateController = {
 
     const modelConfig = db.prepare('SELECT * FROM ai_models WHERE id = ? AND user_id = ?').get(model_id, req.user.id);
     if (!modelConfig) return res.status(404).json({ message: 'Model AI tidak ditemukan' });
+
+    // Model gambar (opsional) — hanya model bertipe 'image' yang boleh dipakai
+    let imageModel = null;
+    if (image_model_id) {
+      imageModel = db.prepare("SELECT * FROM ai_models WHERE id = ? AND user_id = ? AND type = 'image'").get(image_model_id, req.user.id);
+      if (!imageModel) return res.status(404).json({ message: 'Model gambar tidak ditemukan' });
+    }
 
     const provider = modelConfig.provider || 'openrouter';
     const { baseUrl, apiKey: providerApiKey, extraHeaders } = resolveProviderConfig(provider, req.user.id);
@@ -208,7 +227,8 @@ export const generateController = {
         throw new Error('Format respons AI tidak valid');
       }
 
-      // Gambar tidak di‑generate lagi – hanya menyimpan deskripsi untuk referensi user.
+      // Soal yang butuh gambar ditandai oleh LLM (need_image + image_prompt).
+      // Gambarnya digenerate setelah semua soal tersimpan (lihat imageJobs di bawah).
 
       // Simpan soal + generate gambar secara paralel
       const insertSoal = db.prepare(`
@@ -247,7 +267,7 @@ export const generateController = {
           }
 
           if (needImg) {
-            imageJobs.push({ soalId, imagePrompt: s.image_prompt });
+            imageJobs.push({ soalId, imagePrompt: s.image_prompt, soalContext: s.pertanyaan || '' });
           }
 
           const opsi = db.prepare('SELECT * FROM opsi_jawaban WHERE soal_id = ? ORDER BY urutan').all(soalId);
@@ -263,8 +283,66 @@ export const generateController = {
         });
       })();
 
-// Image generation disabled – use placeholder image. The image_prompt is kept for user reference.
-        // No async image jobs are executed.
+      // Generate gambar ilustrasi untuk soal yang butuh gambar (jika user memilih model gambar).
+      // Gagal generate 1 gambar tidak menggagalkan soal — image_prompt tetap tersimpan dan bisa diregenerate manual.
+      let imagesGenerated = 0;
+      let imagesFailed = 0;
+
+      if (imageModel && imageJobs.length > 0) {
+        const imageProvider = imageModel.provider || 'openrouter';
+        const imgCfg = resolveProviderConfig(imageProvider, req.user.id);
+
+        if (!imgCfg.apiKey && imageProvider !== '9router') {
+          sendEvent('image', {
+            soal_id: null,
+            image_url: null,
+            error: `API Key ${imageProvider} belum dikonfigurasi — semua gambar dilewati`
+          });
+        } else {
+          sendEvent('status', { message: `Menggenerate ${imageJobs.length} gambar ilustrasi...` });
+          let finished = 0;
+
+          await runWithConcurrency(imageJobs, 2, async (job) => {
+            try {
+              // Refine prompt: model teks menulis ulang deskripsi mentah jadi prompt detail
+              // (tata letak presisi + label eksak untuk diagram, detail visual untuk ilustrasi).
+              // Gagal refine → fallback ke prompt mentah + style suffix default.
+              let finalPrompt;
+              try {
+                finalPrompt = await refineImagePrompt(job.imagePrompt, {
+                  model: modelConfig.model_id,
+                  baseUrl,
+                  apiKey: providerApiKey,
+                  extraHeaders,
+                  mataPelajaran: resolvedMapel || '',
+                  soalContext: job.soalContext || ''
+                });
+              } catch (refineErr) {
+                console.error(`Refine prompt gagal (soal ${job.soalId}), pakai prompt mentah:`, refineErr.message);
+                finalPrompt = buildImagePrompt(job.imagePrompt);
+              }
+
+              const { buffer, mimeType } = await generateImageBuffer(finalPrompt, {
+                model: imageModel.model_id,
+                provider: imageProvider,
+                baseUrl: imgCfg.baseUrl,
+                apiKey: imgCfg.apiKey,
+                extraHeaders: imgCfg.extraHeaders
+              });
+              const url = saveGeneratedImage(req.user.id, buffer, mimeType);
+              db.prepare("UPDATE soal SET image_url = ?, updated_at = datetime('now') WHERE id = ?").run(url, job.soalId);
+              const soalEntry = savedSoals.find(s => s.id === job.soalId);
+              if (soalEntry) soalEntry.image_url = url;
+              imagesGenerated++;
+              sendEvent('image', { soal_id: job.soalId, image_url: url, refined_prompt: finalPrompt, progress: `${++finished}/${imageJobs.length}` });
+            } catch (err) {
+              imagesFailed++;
+              console.error(`Image gen gagal untuk soal ${job.soalId}:`, err.message);
+              sendEvent('image', { soal_id: job.soalId, image_url: null, error: err.message, progress: `${++finished}/${imageJobs.length}` });
+            }
+          });
+        }
+      }
 
       // Update total soal bank
       const totalSoal = db.prepare('SELECT COUNT(*) as c FROM soal WHERE bank_soal_id = ?').get(bank_soal_id).c;
@@ -278,7 +356,9 @@ export const generateController = {
         message: `${savedSoals.length} soal berhasil dibuat`,
         soal: savedSoals,
         history_id: historyId,
-        duration_ms: duration
+        duration_ms: duration,
+        images_generated: imagesGenerated,
+        images_failed: imagesFailed
       });
 
     } catch (err) {

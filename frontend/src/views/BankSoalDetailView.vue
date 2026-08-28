@@ -110,11 +110,18 @@
               </div>
 
               <!-- Layout: gambar kiri, teks kanan (jika ada gambar) -->
-              <div class="flex gap-4" :class="soal.image_url ? 'flex-row' : ''">
+              <div class="flex gap-4" :class="(soal.image_url || soal.image_prompt) ? 'flex-row' : ''">
                 <!-- Gambar ilustrasi -->
-                <!-- Gambar tidak di‑generate. Tampilkan deskripsi saja -->
-                <div v-if="soal.image_prompt" class="flex-shrink-0 w-40">
-                  <p class="text-xs text-slate-400 mt-1 text-center line-clamp-1">[GAMBAR: {{ soal.image_prompt }}]</p>
+                <div v-if="soal.image_url || soal.image_prompt" class="flex-shrink-0 w-44">
+                  <img v-if="soal.image_url" :src="soal.image_url"
+                    class="w-full rounded-lg border border-slate-200 shadow-sm bg-white"
+                    @error="handleImageError($event, soal)" />
+                  <div v-else class="w-full h-28 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center p-2">
+                    <p class="text-[10px] text-slate-400 text-center line-clamp-3">[GAMBAR: {{ soal.image_prompt }}]</p>
+                  </div>
+                  <p v-if="soal.image_url" class="text-[10px] text-slate-400 mt-1 text-center line-clamp-1" :title="soal.image_prompt">
+                    {{ soal.image_prompt }}
+                  </p>
                 </div>
 
                 <!-- Konten soal -->
@@ -152,6 +159,12 @@
 
             <!-- Actions -->
             <div class="flex items-center gap-1 flex-shrink-0">
+              <button @click="regenerateImage(soal)" :disabled="regeneratingId === soal.id"
+                class="btn-ghost p-1.5 rounded-lg text-slate-500 hover:text-violet-600 hover:bg-violet-50"
+                :title="soal.image_url ? 'Ulangi gambar ilustrasi' : 'Generate gambar ilustrasi'">
+                <Loader2 v-if="regeneratingId === soal.id" class="w-4 h-4 animate-spin" />
+                <ImageIcon v-else class="w-4 h-4" />
+              </button>
               <RouterLink :to="`/soal/${soal.id}/edit`"
                 class="btn-ghost p-1.5 rounded-lg text-slate-500 hover:text-primary-600 hover:bg-primary-50">
                 <Pencil class="w-4 h-4" />
@@ -186,7 +199,7 @@ import { useToast } from 'vue-toastification'
 import {
   ArrowLeft, Sparkles, Download, FileQuestion, Trash2,
   CheckCircle, Key, Lightbulb, Pencil, ChevronLeft, ChevronRight,
-  ImageIcon
+  ImageIcon, Loader2
 } from 'lucide-vue-next'
 import api from '../utils/api.js'
 
@@ -214,6 +227,24 @@ const kesulitanBadge = (k) => ({
 function handleImageError(event, soal) {
   // Sembunyikan gambar yang gagal load
   event.target.style.display = 'none'
+}
+
+// Generate / ulangi gambar ilustrasi untuk satu soal
+const regeneratingId = ref(null)
+async function regenerateImage(soal) {
+  regeneratingId.value = soal.id
+  try {
+    const { data } = await api.post(`/soal/${soal.id}/regenerate-image`, {
+      image_prompt: soal.image_prompt || undefined
+    })
+    soal.image_url = data.data.image_url
+    soal.image_prompt = data.data.image_prompt
+    toast.success('Gambar ilustrasi berhasil dibuat')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Gagal generate gambar')
+  } finally {
+    regeneratingId.value = null
+  }
 }
 
 async function fetchBank() {

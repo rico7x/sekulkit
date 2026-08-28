@@ -139,8 +139,13 @@
               <p class="text-sm text-slate-500">Belum ada model dikonfigurasi.</p>
               <RouterLink to="/konfigurasi" class="btn-primary btn-sm mt-2">Tambah Model</RouterLink>
             </div>
+            <div v-else-if="textModels.length === 0" class="text-center py-4">
+              <BrainCircuit class="w-8 h-8 mx-auto text-slate-300 mb-2" />
+              <p class="text-sm text-slate-500">Belum ada model <strong>teks</strong> untuk generate soal.</p>
+              <RouterLink to="/konfigurasi" class="btn-primary btn-sm mt-2">Tambah Model</RouterLink>
+            </div>
             <div v-else class="space-y-2">
-              <div v-for="m in models" :key="m.id"
+              <div v-for="m in textModels" :key="m.id"
                 @click="form.model_id = m.id"
                 class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
                 :class="form.model_id === m.id
@@ -156,6 +161,28 @@
                 </div>
                 <span v-if="m.is_default" class="badge badge-primary">Default</span>
               </div>
+            </div>
+
+            <!-- Model gambar ilustrasi (opsional) -->
+            <div class="mt-4 pt-4 border-t border-slate-100">
+              <label class="label flex items-center gap-1.5 mb-1.5">
+                <ImageIcon class="w-4 h-4 text-violet-500" /> Model Gambar Ilustrasi
+                <span class="text-xs font-normal text-slate-400">— opsional</span>
+              </label>
+              <select v-model="form.image_model_id" class="input">
+                <option value="">— Tanpa gambar (hanya simpan deskripsi) —</option>
+                <option v-for="m in imageModels" :key="m.id" :value="m.id">
+                  {{ m.name }}{{ m.is_default ? ' (default)' : '' }}
+                </option>
+              </select>
+              <p v-if="imageModels.length === 0" class="text-xs text-slate-400 mt-1">
+                Belum ada model gambar.
+                <RouterLink to="/konfigurasi" class="text-primary-600 underline">Tambah di Konfigurasi</RouterLink>
+                — soal yang butuh ilustrasi hanya menyimpan deskripsinya.
+              </p>
+              <p v-else class="text-xs text-slate-400 mt-1">
+                Soal yang butuh ilustrasi otomatis digenerate gambarnya dan disisipkan ke soal.
+              </p>
             </div>
           </div>
         </div>
@@ -205,6 +232,11 @@
               </div>
               <p class="text-xs text-slate-500 flex items-center gap-1">
                 <Clock class="w-3.5 h-3.5" /> Selesai dalam {{ (result.duration_ms / 1000).toFixed(1) }}s
+              </p>
+              <p v-if="imageProgress.total > 0" class="text-xs flex items-center gap-1"
+                :class="imageProgress.failed > 0 ? 'text-amber-600' : 'text-violet-600'">
+                <ImageIcon class="w-3.5 h-3.5" />
+                {{ imageProgress.done }} gambar ilustrasi dibuat{{ imageProgress.failed > 0 ? `, ${imageProgress.failed} gagal (bisa diregenerate di detail soal)` : '' }}
               </p>
               <RouterLink :to="`/bank-soal/${form.bank_soal_id}`" class="btn-primary w-full justify-center">
                 Lihat Soal <ArrowRight class="w-4 h-4" />
@@ -279,7 +311,7 @@ import { useToast } from 'vue-toastification'
 import {
   Library, Plus, SlidersHorizontal, BookOpenCheck, BrainCircuit,
   Settings, Sparkles, Loader2, CheckCircle, Clock, ArrowRight,
-  AlertCircle, Lightbulb, MessageSquarePlus
+  AlertCircle, Lightbulb, MessageSquarePlus, ImageIcon
 } from 'lucide-vue-next'
 import { useBankSoalStore } from '../stores/bankSoal.js'
 import api from '../utils/api.js'
@@ -301,9 +333,16 @@ const form = ref({
   bank_soal_id: '', bab: '', materi: '',
   jenis_soal: 'pg', jumlah: 10,
   tingkat_kesulitan: 'sedang', jumlah_opsi: 4,
-  generate_pembahasan: false, model_id: '', custom_prompt: ''
+  generate_pembahasan: false, model_id: '', image_model_id: '', custom_prompt: ''
 })
 const newBank = ref({ nama: '', mata_pelajaran: '', jenjang: '', kelas: '' })
+
+// Pisahkan model teks (untuk radio list) dan model gambar (untuk dropdown ilustrasi)
+const textModels = computed(() => models.value.filter(m => (m.type || 'text') === 'text'))
+const imageModels = computed(() => models.value.filter(m => m.type === 'image'))
+
+// Progress generate gambar (di-update lewat SSE event 'image')
+const imageProgress = ref({ done: 0, total: 0, failed: 0 })
 
 const isFormValid = computed(() =>
   form.value.bank_soal_id && form.value.bab && form.value.materi && form.value.model_id
@@ -314,8 +353,10 @@ onMounted(async () => {
   banks.value = bankStore.banks
   const { data } = await api.get('/config/models')
   models.value = data.data
-  const def = models.value.find(m => m.is_default) || models.value[0]
+  const def = textModels.value.find(m => m.is_default) || textModels.value[0]
   if (def) form.value.model_id = def.id
+  const defImg = imageModels.value.find(m => m.is_default) || imageModels.value[0]
+  if (defImg) form.value.image_model_id = defImg.id
 })
 
 async function handleGenerate() {
@@ -325,6 +366,7 @@ async function handleGenerate() {
   errorMessage.value = ''
   streamingText.value = ''
   statusMessage.value = 'Menghubungi AI...'
+  imageProgress.value = { done: 0, total: 0, failed: 0 }
 
   try {
     const response = await fetch('/api/generate', {
@@ -356,6 +398,15 @@ async function handleGenerate() {
           const event = eventMatch?.[1]
           if (event === 'status') statusMessage.value = payload.message
           else if (event === 'token') streamingText.value += payload.delta
+          else if (event === 'image') {
+            // Progress generate gambar ilustrasi
+            if (!imageProgress.value.total && payload.progress) {
+              imageProgress.value.total = parseInt(payload.progress.split('/')[1]) || 0
+            }
+            if (payload.image_url) imageProgress.value.done++
+            else if (payload.error) imageProgress.value.failed++
+            if (payload.progress) statusMessage.value = `Menggenerate gambar ilustrasi (${payload.progress})...`
+          }
           else if (event === 'done') { result.value = payload; toast.success(`${payload.soal?.length || 0} soal berhasil dibuat!`) }
           else if (event === 'error') { errorMessage.value = payload.message; toast.error(payload.message) }
         } catch {}

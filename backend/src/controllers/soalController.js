@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/init.js';
+import { resolveProviderConfig } from './configController.js';
 
 function getSoalWithOpsi(soalId) {
   const soal = db.prepare('SELECT * FROM soal WHERE id = ?').get(soalId);
@@ -81,13 +82,16 @@ export const soalController = {
     const existing = db.prepare('SELECT * FROM soal WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!existing) return res.status(404).json({ message: 'Soal tidak ditemukan' });
 
-    const { bab, materi, jenis, pertanyaan, tingkat_kesulitan, skor, pembahasan, tags, opsi, is_verified } = req.body;
+    const { bab, materi, jenis, pertanyaan, tingkat_kesulitan, skor, pembahasan, tags, opsi, is_verified, image_prompt } = req.body;
+
+    // image_prompt opsional (diedit dari halaman edit soal); undefined = pertahankan lama
+    const finalImagePrompt = image_prompt !== undefined ? image_prompt : existing.image_prompt;
 
     db.prepare(`
       UPDATE soal SET bab=?, materi=?, jenis=?, pertanyaan=?, tingkat_kesulitan=?, skor=?,
-      pembahasan=?, tags=?, is_verified=?, updated_at=datetime('now') WHERE id=?
+      pembahasan=?, tags=?, is_verified=?, image_prompt=?, updated_at=datetime('now') WHERE id=?
     `).run(bab, materi, jenis, pertanyaan, tingkat_kesulitan, skor || 10,
-      pembahasan, JSON.stringify(tags || []), is_verified ? 1 : 0, req.params.id);
+      pembahasan, JSON.stringify(tags || []), is_verified ? 1 : 0, finalImagePrompt, req.params.id);
 
     // Update opsi
     if (opsi !== undefined) {
@@ -144,17 +148,73 @@ export const soalImageController = {
     const soal = db.prepare('SELECT * FROM soal WHERE id = ? AND user_id = ?').get(id, req.user.id);
     if (!soal) return res.status(404).json({ message: 'Soal tidak ditemukan' });
 
-    const { image_prompt, custom_prompt } = req.body;
+    const { image_prompt, custom_prompt, image_model_id } = req.body || {};
     const finalPrompt = custom_prompt || image_prompt || soal.image_prompt;
     if (!finalPrompt) return res.status(400).json({ message: 'Image prompt diperlukan' });
 
+    // Model gambar: dari request, atau default model bertipe 'image' milik user
+    let imageModel = null;
+    if (image_model_id) {
+      imageModel = db.prepare("SELECT * FROM ai_models WHERE id = ? AND user_id = ? AND type = 'image'").get(image_model_id, req.user.id);
+      if (!imageModel) return res.status(404).json({ message: 'Model gambar tidak ditemukan' });
+    } else {
+      imageModel = db.prepare(`
+        SELECT * FROM ai_models WHERE user_id = ? AND type = 'image'
+        ORDER BY is_default DESC, created_at DESC LIMIT 1
+      `).get(req.user.id);
+    }
+    if (!imageModel) {
+      return res.status(400).json({ message: 'Belum ada model gambar (type=image) dikonfigurasi. Tambahkan di Konfigurasi → Model AI.' });
+    }
+
+    const provider = imageModel.provider || 'openrouter';
+    const { baseUrl, apiKey, extraHeaders } = resolveProviderConfig(provider, req.user.id);
+    if (!apiKey && provider !== '9router') {
+      return res.status(400).json({ message: `API Key ${provider} belum dikonfigurasi` });
+    }
+
     try {
-      const { generateImage } = await import('../utils/imageGen.js');
-      const bank = db.prepare('SELECT mata_pelajaran FROM bank_soal WHERE id = ?').get(soal.bank_soal_id);
-      const url = await generateImage(finalPrompt, bank?.mata_pelajaran || '');
+      const { generateImageBuffer, saveGeneratedImage, refineImagePrompt, buildImagePrompt } = await import('../utils/imageGen.js');
+
+      // Refine prompt via default model teks user (kalau ada) — sama seperti flow generate.
+      // Gagal refine → fallback prompt mentah + style suffix default.
+      let refinedPrompt;
+      const textModel = db.prepare(`
+        SELECT * FROM ai_models WHERE user_id = ? AND type = 'text'
+        ORDER BY is_default DESC, created_at DESC LIMIT 1
+      `).get(req.user.id);
+      if (textModel) {
+        const tProvider = textModel.provider || 'openrouter';
+        const tCfg = resolveProviderConfig(tProvider, req.user.id);
+        if (tCfg.apiKey || tProvider === '9router') {
+          try {
+            const bank = db.prepare('SELECT mata_pelajaran FROM bank_soal WHERE id = ?').get(soal.bank_soal_id);
+            refinedPrompt = await refineImagePrompt(finalPrompt, {
+              model: textModel.model_id,
+              baseUrl: tCfg.baseUrl,
+              apiKey: tCfg.apiKey,
+              extraHeaders: tCfg.extraHeaders,
+              mataPelajaran: bank?.mata_pelajaran || '',
+              soalContext: soal.pertanyaan || ''
+            });
+          } catch (refineErr) {
+            console.error('Refine prompt gagal, pakai prompt mentah:', refineErr.message);
+          }
+        }
+      }
+      if (!refinedPrompt) refinedPrompt = buildImagePrompt(finalPrompt);
+
+      const { buffer, mimeType } = await generateImageBuffer(refinedPrompt, {
+        model: imageModel.model_id,
+        provider,
+        baseUrl,
+        apiKey,
+        extraHeaders
+      });
+      const url = saveGeneratedImage(req.user.id, buffer, mimeType);
       db.prepare("UPDATE soal SET image_url = ?, image_prompt = ?, updated_at = datetime('now') WHERE id = ?")
         .run(url, finalPrompt, id);
-      res.json({ data: { image_url: url, image_prompt: finalPrompt } });
+      res.json({ data: { image_url: url, image_prompt: finalPrompt, refined_prompt: refinedPrompt } });
     } catch (err) {
       res.status(500).json({ message: 'Gagal generate gambar: ' + err.message });
     }

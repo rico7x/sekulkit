@@ -2,7 +2,7 @@ import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, ShadingType, AlignmentType, BorderStyle
 } from 'docx'
-import { htmlToDocxStructures } from '../htmlToDocx.js'
+import { htmlToDocxStructures, withSoalImage } from '../htmlToDocx.js'
 import { EXO_TYPE, getKunciLabel, getKunciTeks } from './index.js'
 
 const FONT = { name: 'Calibri' }
@@ -129,8 +129,8 @@ async function buildSoalTable(soal, nomor) {
   rows.push(row('KJ', kj, SH_GREEN, SH_GREEN))
   rows.push(row('ABS', abs, SH_GREEN, SH_GREEN))
 
-  // ── Baris 5: nomor → pertanyaan ──
-  rows.push(await rowHtml(`${nomor}.`, soal.pertanyaan, SH_BLUE))
+  // ── Baris 5: nomor → pertanyaan (+ gambar ilustrasi jika ada) ──
+  rows.push(await rowHtml(`${nomor}.`, withSoalImage(soal), SH_BLUE))
 
   // ── Baris berikutnya: sesuai jenis ──
   switch (soal.jenis) {

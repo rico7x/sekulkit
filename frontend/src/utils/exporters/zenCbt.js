@@ -2,7 +2,7 @@ import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, ShadingType, AlignmentType, BorderStyle
 } from 'docx'
-import { htmlToDocxStructures } from '../htmlToDocx.js'
+import { htmlToDocxStructures, withSoalImage } from '../htmlToDocx.js'
 import { ZEN_TYPE, getKunciLabel, getKunciTeks } from './index.js'
 
 const FONT = { name: 'Times New Roman' }
@@ -81,8 +81,8 @@ async function buildSoalTable(soal, nomor) {
   rows.push(row('No', nomor))
   // Tipe
   rows.push(row('Tipe', ZEN_TYPE[soal.jenis] || soal.jenis))
-  // Teks (HTML)
-  rows.push(await rowHtml('Teks', soal.pertanyaan))
+  // Teks (HTML) — termasuk gambar ilustrasi soal jika ada
+  rows.push(await rowHtml('Teks', withSoalImage(soal)))
 
   switch (soal.jenis) {
     case 'pg':

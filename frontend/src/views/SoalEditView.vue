@@ -70,14 +70,35 @@
         </div>
       </div>
 
-      <div v-if="form.image_prompt" class="card">
+      <div v-if="form.image_prompt || form.image_url" class="card">
         <div class="card-header">
           <h3 class="font-semibold text-slate-800 text-sm flex items-center gap-2">
-            <span class="text-violet-500">Gambar Ilustrasi</span>
+            <ImageIcon class="w-4 h-4 text-violet-500" /> Gambar Ilustrasi
           </h3>
+          <div class="flex items-center gap-2">
+            <button type="button" @click="regenerateImage" :disabled="regenerating" class="btn-secondary btn-sm">
+              <Loader2 v-if="regenerating" class="w-3.5 h-3.5 animate-spin" />
+              <Sparkles v-else class="w-3.5 h-3.5" />
+              {{ form.image_url ? 'Ulangi Gambar' : 'Generate Gambar' }}
+            </button>
+            <button v-if="form.image_url" type="button" @click="removeImage" class="btn-ghost btn-sm text-red-500 hover:bg-red-50">
+              Hapus Gambar
+            </button>
+          </div>
         </div>
-        <div class="card-body">
-          <p class="text-sm text-slate-600">[GAMBAR: {{ form.image_prompt }}]</p>
+        <div class="card-body space-y-3">
+          <img v-if="form.image_url" :src="form.image_url" class="max-w-xs rounded-lg border border-slate-200 shadow-sm bg-white"
+            @error="form.image_url = null" />
+          <div v-else class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+            <ImageIcon class="w-6 h-6 mx-auto text-slate-300 mb-1" />
+            <p class="text-xs text-slate-400">Gambar belum dibuat — klik "Generate Gambar"</p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-500">Deskripsi Gambar (image prompt)</label>
+            <textarea v-model="form.image_prompt" rows="2" class="input text-xs mt-1 resize-y"
+              placeholder="Deskripsi gambar dalam bahasa Inggris..."></textarea>
+            <p class="text-xs text-slate-400 mt-1">Ubah deskripsi lalu klik "Ulangi Gambar" untuk menggenerate ulang.</p>
+          </div>
         </div>
       </div>
 
@@ -170,7 +191,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import {
   ArrowLeft, Info, HelpCircle, ListChecks, Plus, X,
-  Key, Lightbulb, BadgeCheck, Loader2, Save
+  Key, Lightbulb, BadgeCheck, Loader2, Save, ImageIcon, Sparkles
 } from 'lucide-vue-next'
 import api from '../utils/api.js'
 import RichTextEditor from '../components/RichTextEditor.vue'
@@ -206,6 +227,30 @@ watch(() => form.value.jenis, (val) => {
 })
 
 function setBenar(idx) { form.value.opsi.forEach((o, i) => { o.is_benar = i === idx }) }
+
+// ===== Gambar ilustrasi =====
+const regenerating = ref(false)
+async function regenerateImage() {
+  regenerating.value = true
+  try {
+    const { data } = await api.post(`/soal/${soalId}/regenerate-image`, { image_prompt: form.value.image_prompt })
+    form.value.image_url = data.data.image_url
+    form.value.image_prompt = data.data.image_prompt
+    toast.success('Gambar ilustrasi berhasil dibuat')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Gagal generate gambar')
+  } finally { regenerating.value = false }
+}
+
+async function removeImage() {
+  if (!confirm('Hapus gambar ilustrasi ini?')) return
+  try {
+    await api.delete(`/soal/${soalId}/image`)
+    form.value.image_url = null
+    form.value.image_prompt = ''
+    toast.success('Gambar dihapus')
+  } catch { toast.error('Gagal menghapus gambar') }
+}
 function addOpsi() {
   if (form.value.opsi.length >= 6) return
   form.value.opsi.push({ label: LABELS[form.value.opsi.length], teks: '', is_benar: false })

@@ -4,11 +4,37 @@ import { tokenizeMath, latexToOmmlElement } from './latexToOmml.js'
 /**
  * Fetch image URL → ArrayBuffer
  */
+function resolveImageUrl(src) {
+  return src.startsWith('/') ? window.location.origin + src : src
+}
+
 async function fetchImageAsBuffer(url) {
-  const fullUrl = url.startsWith('/') ? window.location.origin + url : url
+  const fullUrl = resolveImageUrl(url)
   const res = await fetch(fullUrl)
   if (!res.ok) throw new Error(`Gagal fetch gambar: ${url}`)
   return await res.arrayBuffer()
+}
+
+/**
+ * Ambil dimensi asli gambar (untuk rasio aspek di DOCX).
+ * Balikin null kalau gagal — pemanggil pakai default.
+ */
+function getImageSize(url) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+/**
+ * Gabungkan HTML pertanyaan dengan gambar ilustrasi soal (jika ada),
+ * supaya gambar ikut terbawa di preview print & semua exporter DOCX.
+ */
+export function withSoalImage(soal) {
+  if (!soal?.image_url) return soal?.pertanyaan || ''
+  return `${soal.pertanyaan || ''}<p><img src="${soal.image_url}" class="soal-image" /></p>`
 }
 
 /**
@@ -60,7 +86,7 @@ async function inlineToRuns(node) {
 
   const tag = node.tagName
 
-  // Image → ImageRun
+  // Image → ImageRun (rasio aspek dipertahankan, max 320×320)
   if (tag === 'IMG') {
     const src = node.getAttribute('src')
     if (!src) return []
@@ -72,9 +98,16 @@ async function inlineToRuns(node) {
         buffer = await fetchImageAsBuffer(src)
       }
       const mimeType = getMimeType(buffer)
+      let width = 320, height = 240
+      const dims = await getImageSize(resolveImageUrl(src))
+      if (dims?.width > 0 && dims?.height > 0) {
+        const scale = Math.min(320 / dims.width, 320 / dims.height, 1)
+        width = Math.max(1, Math.round(dims.width * scale))
+        height = Math.max(1, Math.round(dims.height * scale))
+      }
       return [new ImageRun({
         data: buffer,
-        transformation: { width: 400, height: 300 },
+        transformation: { width, height },
         type: mimeType
       })]
     } catch (err) {

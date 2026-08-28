@@ -48,6 +48,7 @@ export function initDB() {
       name TEXT NOT NULL,
       model_id TEXT NOT NULL,
       provider TEXT NOT NULL DEFAULT 'openrouter',
+      type TEXT NOT NULL DEFAULT 'text' CHECK(type IN ('text', 'image')),
       is_default INTEGER NOT NULL DEFAULT 0,
       max_tokens INTEGER NOT NULL DEFAULT 4096,
       temperature REAL NOT NULL DEFAULT 0.7,
@@ -164,6 +165,12 @@ export function initDB() {
   try {
     db.exec(`ALTER TABLE soal ADD COLUMN image_prompt TEXT`);
     console.log('✅ Migration: added image_prompt column');
+  } catch {}
+
+  // Migration: kolom type di ai_models ('text' = model teks, 'image' = model gambar)
+  try {
+    db.exec(`ALTER TABLE ai_models ADD COLUMN type TEXT NOT NULL DEFAULT 'text'`);
+    console.log('✅ Migration: added ai_models.type column');
   } catch {}
 
   // Create uploaded_files table for file upload tracking

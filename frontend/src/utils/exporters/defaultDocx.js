@@ -1,5 +1,5 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx'
-import { htmlToDocxStructures, buildDocxParagraphs } from '../htmlToDocx.js'
+import { htmlToDocxStructures, buildDocxParagraphs, withSoalImage } from '../htmlToDocx.js'
 
 /**
  * Export "Default" — dokumen ujian standar (kop + soal + opsi + kunci).
@@ -43,7 +43,7 @@ export async function exportDefaultDocx({ soal, layout, options = {} }) {
     const s = soal[idx]
     const num = startNumber + idx
 
-    const pertanyaanStructs = await htmlToDocxStructures(s.pertanyaan)
+    const pertanyaanStructs = await htmlToDocxStructures(withSoalImage(s))
     if (pertanyaanStructs.length > 0) {
       const first = pertanyaanStructs[0]
       first.runs.unshift(new TextRun({ text: `${num}. `, bold: true }))

@@ -118,17 +118,18 @@ export const configController = {
   },
 
   createModel(req, res) {
-    const { name, model_id, provider = 'openrouter', max_tokens = 4096, temperature = 0.7, notes } = req.body;
+    const { name, model_id, provider = 'openrouter', type = 'text', max_tokens = 4096, temperature = 0.7, notes } = req.body;
     if (!name || !model_id) return res.status(400).json({ message: 'Name dan model_id wajib diisi' });
 
     const id = uuidv4();
-    const count = db.prepare('SELECT COUNT(*) as c FROM ai_models WHERE user_id = ?').get(req.user.id).c;
+    const modelType = ['text', 'image'].includes(type) ? type : 'text';
+    const count = db.prepare('SELECT COUNT(*) as c FROM ai_models WHERE user_id = ? AND type = ?').get(req.user.id, modelType).c;
     const is_default = count === 0 ? 1 : 0;
 
     db.prepare(`
-      INSERT INTO ai_models (id, user_id, name, model_id, provider, max_tokens, temperature, notes, is_default)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, req.user.id, name, model_id, provider, max_tokens, temperature, notes, is_default);
+      INSERT INTO ai_models (id, user_id, name, model_id, provider, type, max_tokens, temperature, notes, is_default)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, req.user.id, name, model_id, provider, modelType, max_tokens, temperature, notes, is_default);
 
     res.status(201).json({ data: db.prepare('SELECT * FROM ai_models WHERE id = ?').get(id) });
   },
@@ -137,13 +138,17 @@ export const configController = {
     const model = db.prepare('SELECT id FROM ai_models WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!model) return res.status(404).json({ message: 'Model tidak ditemukan' });
 
-    const { name, model_id, provider, max_tokens, temperature, notes } = req.body;
-    // provider optional update (defaults to existing if not sent)
+    const { name, model_id, provider, type, max_tokens, temperature, notes } = req.body;
+    // provider/type optional update (defaults to existing if not sent)
     const updateFields = ['name=?', 'model_id=?', 'max_tokens=?', 'temperature=?', 'notes=?'];
     const updateValues = [name, model_id, max_tokens, temperature, notes];
     if (provider) {
       updateFields.push('provider=?');
       updateValues.push(provider);
+    }
+    if (type && ['text', 'image'].includes(type)) {
+      updateFields.push('type=?');
+      updateValues.push(type);
     }
     updateValues.push(req.params.id);
 
@@ -160,9 +165,11 @@ export const configController = {
   },
 
   setDefaultModel(req, res) {
-    const model = db.prepare('SELECT id FROM ai_models WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const model = db.prepare('SELECT id, type FROM ai_models WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!model) return res.status(404).json({ message: 'Model tidak ditemukan' });
-    db.prepare('UPDATE ai_models SET is_default = 0 WHERE user_id = ?').run(req.user.id);
+    // Default per tipe: default model teks tidak terpengaruh saat set default model gambar, dst.
+    const type = model.type || 'text';
+    db.prepare('UPDATE ai_models SET is_default = 0 WHERE user_id = ? AND type = ?').run(req.user.id, type);
     db.prepare('UPDATE ai_models SET is_default = 1 WHERE id = ?').run(req.params.id);
     res.json({ message: 'Default model diperbarui' });
   },

@@ -183,6 +183,11 @@
                   <span v-rich="soal.pertanyaan"></span>
                 </div>
 
+                <!-- Gambar ilustrasi soal (juga ikut tercetak saat Export PDF) -->
+                <div v-if="soal.image_url" class="mt-1.5 ml-5">
+                  <img :src="soal.image_url" class="max-w-[280px] max-h-48 rounded border border-slate-200" />
+                </div>
+
                 <div v-if="soal.opsi?.length && ['pg','pgk'].includes(soal.jenis)" class="mt-1.5 ml-5 space-y-0.5">
                   <p v-for="opsi in soal.opsi" :key="opsi.id"
                     :class="layout.showKunci && opsi.is_benar ? 'text-emerald-700 font-semibold' : 'text-slate-700'">

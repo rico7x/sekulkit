@@ -79,7 +79,7 @@
     <!-- Tab: Model AI -->
     <div v-if="activeTab === 'models'" class="space-y-5">
       <div class="flex items-center justify-between">
-        <p class="text-sm text-slate-600">Tambahkan model AI yang ingin digunakan untuk generate soal.</p>
+        <p class="text-sm text-slate-600">Model <strong>Teks</strong> untuk generate soal, model <strong>Gambar</strong> untuk ilustrasi soal.</p>
         <button @click="openModelForm()" class="btn-primary btn-sm">+ Tambah Model</button>
       </div>
 
@@ -128,9 +128,12 @@
                 <p class="font-semibold text-slate-800">{{ m.name }}</p>
                 <span v-if="m.is_default" class="badge badge-primary">Default</span>
                 <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{{ m.provider || 'openrouter' }}</span>
+                <span v-if="(m.type || 'text') === 'image'" class="badge bg-violet-100 text-violet-700">🖼️ Gambar</span>
+                <span v-else class="badge bg-sky-100 text-sky-700">📝 Teks</span>
               </div>
               <p class="text-xs text-slate-500 font-mono mt-0.5">{{ m.model_id }}</p>
-              <p class="text-xs text-slate-500 mt-1">Max tokens: {{ m.max_tokens }} · Temp: {{ m.temperature }}</p>
+              <p v-if="(m.type || 'text') === 'text'" class="text-xs text-slate-500 mt-1">Max tokens: {{ m.max_tokens }} · Temp: {{ m.temperature }}</p>
+              <p v-else class="text-xs text-slate-500 mt-1">Model gambar ilustrasi soal</p>
             </div>
             <div class="flex items-center gap-2">
               <button v-if="!m.is_default" @click="setDefault(m.id)" class="btn-secondary btn-sm">Set Default</button>
@@ -175,6 +178,13 @@
         <h3 class="text-lg font-semibold mb-5">{{ editModelId ? 'Edit Model' : 'Tambah Model AI' }}</h3>
         <div class="space-y-3">
           <div>
+            <label class="label">Tipe Model</label>
+            <select v-model="modelForm.type" class="input">
+              <option value="text">📝 Teks — generate soal</option>
+              <option value="image">🖼️ Gambar — ilustrasi soal</option>
+            </select>
+          </div>
+          <div>
             <label class="label">Nama / Label</label>
             <input v-model="modelForm.name" type="text" class="input" placeholder="cth: Llama 3.1 (Free)" />
           </div>
@@ -188,9 +198,14 @@
           <div>
             <label class="label">Model ID</label>
             <input v-model="modelForm.model_id" type="text" class="input font-mono"
-              :placeholder="modelForm.provider === '9router' ? 'cth: gpt-4o-mini' : 'cth: meta-llama/llama-3.1-8b-instruct:free'" />
+              :placeholder="modelForm.type === 'image'
+                ? 'cth: google/gemini-2.5-flash-image'
+                : (modelForm.provider === '9router' ? 'cth: gpt-4o-mini' : 'cth: meta-llama/llama-3.1-8b-instruct:free')" />
+            <p v-if="modelForm.type === 'image'" class="text-xs text-slate-400 mt-1">
+              OpenRouter: gemini image models. 9router: model OpenAI-compatible dengan endpoint /images/generations.
+            </p>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div v-if="modelForm.type === 'text'" class="grid grid-cols-2 gap-3">
             <div>
               <label class="label">Max Tokens</label>
               <input v-model.number="modelForm.max_tokens" type="number" class="input" />
@@ -284,7 +299,7 @@ const browseProvider = ref('openrouter')
 const showModelForm = ref(false)
 const editModelId = ref(null)
 const savingModel = ref(false)
-const modelForm = ref({ name: '', provider: 'openrouter', model_id: '', max_tokens: 4096, temperature: 0.7, notes: '' })
+const modelForm = ref({ name: '', provider: 'openrouter', model_id: '', type: 'text', max_tokens: 4096, temperature: 0.7, notes: '' })
 
 // Templates
 const templates = ref([])
@@ -350,13 +365,13 @@ async function loadRemoteModels() {
 function openModelForm(m = null) {
   editModelId.value = m?.id || null
   modelForm.value = m
-    ? { name: m.name, provider: m.provider || 'openrouter', model_id: m.model_id, max_tokens: m.max_tokens, temperature: m.temperature, notes: m.notes || '' }
-    : { name: '', provider: 'openrouter', model_id: '', max_tokens: 4096, temperature: 0.7, notes: '' }
+    ? { name: m.name, provider: m.provider || 'openrouter', model_id: m.model_id, type: m.type || 'text', max_tokens: m.max_tokens, temperature: m.temperature, notes: m.notes || '' }
+    : { name: '', provider: 'openrouter', model_id: '', type: 'text', max_tokens: 4096, temperature: 0.7, notes: '' }
   showModelForm.value = true
 }
 
 function quickAddModel(m) {
-  modelForm.value = { name: m.name, provider: browseProvider.value, model_id: m.id, max_tokens: 4096, temperature: 0.7, notes: m.is_free ? 'Model gratis' : '' }
+  modelForm.value = { name: m.name, provider: browseProvider.value, model_id: m.id, type: 'text', max_tokens: 4096, temperature: 0.7, notes: m.is_free ? 'Model gratis' : '' }
   editModelId.value = null
   showModelForm.value = true
 }
