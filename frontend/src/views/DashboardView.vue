@@ -2,7 +2,7 @@
   <div class="p-6 max-w-6xl mx-auto">
     <!-- Welcome -->
     <div class="mb-6">
-      <h2 class="text-xl font-bold text-slate-900">Selamat datang, {{ auth.user?.name }}! 👋</h2>
+      <h2 class="text-xl font-bold text-slate-900">Selamat datang, {{ auth.user?.name }}</h2>
       <p class="text-slate-500 text-sm mt-1">{{ auth.user?.lembaga || 'SoalGen — AI Question Generator' }}</p>
     </div>
 
@@ -10,9 +10,9 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <div class="card p-5">
         <div class="flex items-center justify-between mb-2">
-          <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Bank Soal</p>
-          <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
-            <Library class="w-4 h-4 text-primary-600" />
+          <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Bank Soal</p>
+          <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+            <Library class="w-4 h-4 text-slate-500" />
           </div>
         </div>
         <p class="text-3xl font-bold text-slate-900">{{ stats.banks }}</p>
@@ -20,27 +20,27 @@
       </div>
       <div class="card p-5">
         <div class="flex items-center justify-between mb-2">
-          <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Soal</p>
-          <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-            <FileQuestion class="w-4 h-4 text-emerald-600" />
+          <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Soal</p>
+          <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+            <FileQuestion class="w-4 h-4 text-slate-500" />
           </div>
         </div>
         <p class="text-3xl font-bold text-slate-900">{{ stats.soal }}</p>
       </div>
       <div class="card p-5">
         <div class="flex items-center justify-between mb-2">
-          <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Generate Hari Ini</p>
-          <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-            <Zap class="w-4 h-4 text-amber-600" />
+          <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Generate Hari Ini</p>
+          <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+            <Zap class="w-4 h-4 text-slate-500" />
           </div>
         </div>
-        <p class="text-3xl font-bold text-primary-600">{{ stats.todayGenerate }}</p>
+        <p class="text-3xl font-bold text-slate-900">{{ stats.todayGenerate }}</p>
       </div>
       <div class="card p-5">
         <div class="flex items-center justify-between mb-2">
-          <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Model AI</p>
-          <div class="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
-            <BrainCircuit class="w-4 h-4 text-violet-600" />
+          <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Model AI</p>
+          <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+            <BrainCircuit class="w-4 h-4 text-slate-500" />
           </div>
         </div>
         <p class="text-3xl font-bold text-slate-900">{{ stats.models }}</p>
@@ -50,25 +50,25 @@
 
     <!-- Quick actions -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      <RouterLink to="/generate" class="card p-5 hover:shadow-md hover:border-primary-200 transition-all duration-200 group">
-        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-600 transition-colors">
+      <RouterLink to="/generate" class="card p-5 hover:border-primary-300 transition-colors duration-150 group">
+        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-600 transition-colors">
           <Sparkles class="w-5 h-5 text-primary-600 group-hover:text-white transition-colors" />
         </div>
         <h3 class="font-semibold text-slate-800">Generate Soal Baru</h3>
         <p class="text-xs text-slate-500 mt-1">Buat soal dengan AI dari materi yang Anda tentukan</p>
       </RouterLink>
 
-      <RouterLink to="/bank-soal" class="card p-5 hover:shadow-md hover:border-primary-200 transition-all duration-200 group">
-        <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-emerald-600 transition-colors">
-          <BookOpen class="w-5 h-5 text-emerald-600 group-hover:text-white transition-colors" />
+      <RouterLink to="/bank-soal" class="card p-5 hover:border-primary-300 transition-colors duration-150 group">
+        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-600 transition-colors">
+          <BookOpen class="w-5 h-5 text-primary-600 group-hover:text-white transition-colors" />
         </div>
         <h3 class="font-semibold text-slate-800">Kelola Bank Soal</h3>
         <p class="text-xs text-slate-500 mt-1">Edit, hapus, dan atur soal yang sudah dibuat</p>
       </RouterLink>
 
-      <RouterLink to="/konfigurasi" class="card p-5 hover:shadow-md hover:border-primary-200 transition-all duration-200 group">
-        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-amber-600 transition-colors">
-          <Settings class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" />
+      <RouterLink to="/konfigurasi" class="card p-5 hover:border-primary-300 transition-colors duration-150 group">
+        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-600 transition-colors">
+          <Settings class="w-5 h-5 text-primary-600 group-hover:text-white transition-colors" />
         </div>
         <h3 class="font-semibold text-slate-800">Konfigurasi AI</h3>
         <p class="text-xs text-slate-500 mt-1">Atur model OpenRouter dan API key Anda</p>
@@ -89,8 +89,8 @@
       <div v-else>
         <div v-for="bank in recentBanks" :key="bank.id"
           class="flex items-center gap-4 px-5 py-3 border-t border-slate-100 hover:bg-slate-50 transition-colors">
-          <div class="w-9 h-9 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <FileText class="w-4 h-4 text-primary-600" />
+          <div class="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <FileText class="w-4 h-4 text-slate-500" />
           </div>
           <div class="flex-1 min-w-0">
             <p class="font-medium text-slate-800 text-sm truncate">{{ bank.nama }}</p>

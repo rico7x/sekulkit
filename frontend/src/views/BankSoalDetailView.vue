@@ -103,7 +103,7 @@
                 <span v-if="soal.is_verified" class="badge badge-green">
                   <CheckCircle class="w-3 h-3 mr-0.5" /> Verified
                 </span>
-                <span v-if="soal.image_url" class="badge bg-violet-100 text-violet-700">
+                <span v-if="soal.image_url" class="badge badge-gray">
                   <ImageIcon class="w-3 h-3 mr-0.5" /> Gambar
                 </span>
                 <span class="text-xs text-slate-400 ml-auto hidden sm:block">{{ soal.bab }} · {{ soal.materi }}</span>

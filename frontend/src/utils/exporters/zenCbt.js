@@ -25,7 +25,9 @@ async function htmlToCellParagraphs(html, opts = {}) {
     return [new Paragraph({ children: [new TextRun({ text: '', font: FONT, size: SZ })], ...opts })]
   }
   // drop heading options (invalid di dalam table cell), keep inline formatting
+  // struktur { table } (tabel soal) di-passthrough apa adanya
   return structs.map(s => {
+    if (s.table) return s.table
     const { heading, alignment, ...safeOpts } = s.options || {}
     return new Paragraph({ children: s.runs, ...safeOpts, ...opts })
   })

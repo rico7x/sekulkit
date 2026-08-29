@@ -1,17 +1,9 @@
 <template>
   <div class="p-6 max-w-7xl mx-auto">
-    <!-- Header banner -->
-    <div class="mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-600 via-primary-600 to-indigo-800 shadow-lg shadow-primary-500/25">
-      <div class="relative px-6 py-5 flex items-center gap-4">
-        <div class="absolute inset-0 opacity-20 bg-[radial-gradient(500px_180px_at_90%_-40%,white,transparent)]"></div>
-        <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center flex-shrink-0 ring-1 ring-white/25">
-          <Sparkles class="w-6 h-6 text-white" />
-        </div>
-        <div class="relative">
-          <h2 class="text-xl font-bold text-white">Generate Soal dengan AI</h2>
-          <p class="text-primary-100 text-sm mt-0.5">Isi data di bawah, lalu AI akan membuatkan soal berkualitas untuk Anda</p>
-        </div>
-      </div>
+    <!-- Header -->
+    <div class="mb-6">
+      <h2 class="text-xl font-bold text-slate-900">Generate Soal dengan AI</h2>
+      <p class="text-slate-500 text-sm mt-1">Isi data di bawah, lalu AI akan membuatkan soal berkualitas untuk Anda</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -81,9 +73,9 @@
               <div class="form-group">
                 <label class="label">Tingkat Kesulitan</label>
                 <select v-model="form.tingkat_kesulitan" class="input">
-                  <option value="mudah">😊 Mudah (C1–C2)</option>
-                  <option value="sedang">🤔 Sedang (C3–C4)</option>
-                  <option value="sulit">🧠 Sulit (C5–C6)</option>
+                  <option value="mudah">Mudah (C1–C2)</option>
+                  <option value="sedang">Sedang (C3–C4)</option>
+                  <option value="sulit">Sulit (C5–C6)</option>
                 </select>
               </div>
               <div v-if="['pg', 'pgk'].includes(form.jenis_soal)" class="form-group">
@@ -166,7 +158,7 @@
             <!-- Model gambar ilustrasi (opsional) -->
             <div class="mt-4 pt-4 border-t border-slate-100">
               <label class="label flex items-center gap-1.5 mb-1.5">
-                <ImageIcon class="w-4 h-4 text-violet-500" /> Model Gambar Ilustrasi
+                <ImageIcon class="w-4 h-4 text-slate-400" /> Model Gambar Ilustrasi
                 <span class="text-xs font-normal text-slate-400">— opsional</span>
               </label>
               <select v-model="form.image_model_id" class="input">
@@ -234,7 +226,7 @@
                 <Clock class="w-3.5 h-3.5" /> Selesai dalam {{ (result.duration_ms / 1000).toFixed(1) }}s
               </p>
               <p v-if="imageProgress.total > 0" class="text-xs flex items-center gap-1"
-                :class="imageProgress.failed > 0 ? 'text-amber-600' : 'text-violet-600'">
+                :class="imageProgress.failed > 0 ? 'text-amber-600' : 'text-slate-500'">
                 <ImageIcon class="w-3.5 h-3.5" />
                 {{ imageProgress.done }} gambar ilustrasi dibuat{{ imageProgress.failed > 0 ? `, ${imageProgress.failed} gagal (bisa diregenerate di detail soal)` : '' }}
               </p>
@@ -258,12 +250,12 @@
         </div>
 
         <!-- Tips -->
-        <div class="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+        <div class="card p-4 bg-amber-50/60 border-amber-100">
           <h4 class="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
             <Lightbulb class="w-4 h-4" /> Tips Generate
           </h4>
           <ul class="text-xs text-amber-700 space-y-1.5">
-            <li class="flex items-start gap-1.5"><span class="mt-0.5">•</span> Gunakan model gratis dari OpenRouter (ditandai ⭐)</li>
+            <li class="flex items-start gap-1.5"><span class="mt-0.5">•</span> Gunakan model gratis dari OpenRouter untuk hemat biaya</li>
             <li class="flex items-start gap-1.5"><span class="mt-0.5">•</span> Materi spesifik = soal lebih relevan</li>
             <li class="flex items-start gap-1.5"><span class="mt-0.5">•</span> PGK cocok untuk evaluasi pemahaman mendalam</li>
             <li class="flex items-start gap-1.5"><span class="mt-0.5">•</span> Aktifkan pembahasan untuk soal latihan</li>
@@ -307,6 +299,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import {
   Library, Plus, SlidersHorizontal, BookOpenCheck, BrainCircuit,
@@ -317,6 +310,7 @@ import { useBankSoalStore } from '../stores/bankSoal.js'
 import api from '../utils/api.js'
 
 const toast = useToast()
+const route = useRoute()
 const bankStore = useBankSoalStore()
 
 const banks = ref([])
@@ -351,6 +345,13 @@ const isFormValid = computed(() =>
 onMounted(async () => {
   await bankStore.fetchAll()
   banks.value = bankStore.banks
+
+  // Prefill dari query param ?bank=<uuid> (link dari halaman Bank Soal)
+  const prefillBank = route.query.bank
+  if (prefillBank && banks.value.some(b => b.id === prefillBank)) {
+    form.value.bank_soal_id = prefillBank
+  }
+
   const { data } = await api.get('/config/models')
   models.value = data.data
   const def = textModels.value.find(m => m.is_default) || textModels.value[0]

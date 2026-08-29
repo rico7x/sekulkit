@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-primary-50 via-white to-cyan-50 flex items-center justify-center p-4">
+  <div class="min-h-screen bg-slate-50 flex items-center justify-center p-4">
     <div class="w-full max-w-md animate-slide-up">
       <!-- Logo -->
       <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-14 h-14 bg-primary-600 rounded-2xl mb-4 shadow-lg shadow-primary-200">
+        <div class="inline-flex items-center justify-center w-14 h-14 bg-primary-600 rounded-2xl mb-4">
           <FileText class="w-7 h-7 text-white" />
         </div>
         <h1 class="text-2xl font-bold text-slate-900">SoalGen</h1>

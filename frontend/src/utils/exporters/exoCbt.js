@@ -29,7 +29,9 @@ async function htmlToCellParagraphs(html, opts = {}) {
   if (structs.length === 0) {
     return [new Paragraph({ children: [new TextRun({ text: '', font: FONT, size: SZ })], ...opts })]
   }
+  // struktur { table } (tabel soal) di-passthrough apa adanya
   return structs.map(s => {
+    if (s.table) return s.table
     const { heading, alignment, ...safeOpts } = s.options || {}
     return new Paragraph({ children: s.runs, ...safeOpts, ...opts })
   })

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/init.js';
 import { shouldGenerateImage, generateImageBuffer, saveGeneratedImage, refineImagePrompt, buildImagePrompt } from '../utils/imageGen.js';
+import { markdownTableToHtml } from '../utils/markdownTable.js';
 import { resolveProviderConfig } from './configController.js';
 
 // Jalankan worker secara paralel dengan batas concurrency
@@ -80,6 +81,7 @@ ATURAN PENTING:
 - Untuk PG/PGK: pastikan semua pengecoh (distraktor) masuk akal
 - Variasikan bentuk pertanyaan agar tidak monoton
 - Untuk rumus matematika/fisika/kimia atau notasi ilmiah, TULIS dengan sintaks LaTeX: gunakan $...$ untuk rumus inline dan $$...$$ untuk rumus blok. Contoh inline: "Akar dari $x^2+3x-4=0$ adalah ...". Contoh blok: "$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$". Gunakan LaTeX HANYA bila materi memang memuat rumus/simbol matematis; untuk mata pelajaran non-eksakta tulis teks biasa tanpa tanda $.
+- Jika soal membutuhkan TABEL, tulis langsung dengan tag HTML di dalam "pertanyaan": <table class="soal-table"><tr><th>Kolom 1</th><th>Kolom 2</th></tr><tr><td>isi</td><td>isi</td></tr></table>. JANGAN gunakan format markdown (tanda |).
 
 
 FORMAT OUTPUT (wajib JSON murni, tidak ada teks di luar JSON):
@@ -249,10 +251,12 @@ export const generateController = {
         parsedSoal.soal.forEach((s, idx) => {
           const soalId = uuidv4();
           const needImg = shouldGenerateImage(s);
+          // Tabel markdown dari LLM dikonversi ke HTML agar tampil & ter-export sebagai tabel
+          const pertanyaanHtml = markdownTableToHtml(s.pertanyaan || '');
 
           insertSoal.run(
             soalId, bank_soal_id, req.user.id, bab, materi, jenis_soal,
-            s.pertanyaan, tingkat_kesulitan, s.pembahasan || null,
+            pertanyaanHtml, tingkat_kesulitan, s.pembahasan || null,
             '[]', maxNomor + idx + 1,
             null, // image_url — diisi nanti
             needImg ? s.image_prompt : null
@@ -267,13 +271,13 @@ export const generateController = {
           }
 
           if (needImg) {
-            imageJobs.push({ soalId, imagePrompt: s.image_prompt, soalContext: s.pertanyaan || '' });
+            imageJobs.push({ soalId, imagePrompt: s.image_prompt, soalContext: pertanyaanHtml });
           }
 
           const opsi = db.prepare('SELECT * FROM opsi_jawaban WHERE soal_id = ? ORDER BY urutan').all(soalId);
           savedSoals.push({
             id: soalId,
-            pertanyaan: s.pertanyaan,
+            pertanyaan: pertanyaanHtml,
             jenis: jenis_soal,
             opsi,
             need_image: needImg,

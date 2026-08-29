@@ -41,7 +41,7 @@
 
     <!-- Grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="bank in banks" :key="bank.id" class="card hover:shadow-md hover:border-primary-200 transition-all duration-200 flex flex-col">
+      <div v-for="bank in banks" :key="bank.id" class="card hover:border-primary-300 transition-colors duration-150 flex flex-col">
         <div class="p-5 flex-1">
           <div class="flex items-start justify-between gap-2 mb-3">
             <h3 class="font-semibold text-slate-800 text-sm leading-snug">{{ bank.nama }}</h3>

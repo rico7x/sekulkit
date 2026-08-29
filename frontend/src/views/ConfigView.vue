@@ -128,8 +128,8 @@
                 <p class="font-semibold text-slate-800">{{ m.name }}</p>
                 <span v-if="m.is_default" class="badge badge-primary">Default</span>
                 <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{{ m.provider || 'openrouter' }}</span>
-                <span v-if="(m.type || 'text') === 'image'" class="badge bg-violet-100 text-violet-700">🖼️ Gambar</span>
-                <span v-else class="badge bg-sky-100 text-sky-700">📝 Teks</span>
+                <span v-if="(m.type || 'text') === 'image'" class="badge bg-violet-50 text-violet-600">Gambar</span>
+                <span v-else class="badge bg-slate-100 text-slate-500">Teks</span>
               </div>
               <p class="text-xs text-slate-500 font-mono mt-0.5">{{ m.model_id }}</p>
               <p v-if="(m.type || 'text') === 'text'" class="text-xs text-slate-500 mt-1">Max tokens: {{ m.max_tokens }} · Temp: {{ m.temperature }}</p>
@@ -180,8 +180,8 @@
           <div>
             <label class="label">Tipe Model</label>
             <select v-model="modelForm.type" class="input">
-              <option value="text">📝 Teks — generate soal</option>
-              <option value="image">🖼️ Gambar — ilustrasi soal</option>
+              <option value="text">Teks — generate soal</option>
+              <option value="image">Gambar — ilustrasi soal</option>
             </select>
           </div>
           <div>
@@ -271,9 +271,9 @@ import api from '../utils/api.js'
 const toast = useToast()
 const activeTab = ref('api')
 const tabs = [
-  { id: 'api', label: '🔑 API Key' },
-  { id: 'models', label: '🤖 Model AI' },
-  { id: 'templates', label: '📝 Prompt Template' }
+  { id: 'api', label: 'API Key' },
+  { id: 'models', label: 'Model AI' },
+  { id: 'templates', label: 'Prompt Template' }
 ]
 
 // API Key - OpenRouter

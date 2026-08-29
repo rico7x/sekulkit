@@ -1,4 +1,5 @@
 import renderMathInElement from 'katex/contrib/auto-render'
+import { markdownTableToHtml } from '../utils/markdownTable.js'
 
 const OPTS = {
   delimiters: [
@@ -13,7 +14,8 @@ const OPTS = {
 }
 
 function apply(el, html) {
-  el.innerHTML = html ?? ''
+  // Tabel markdown (dari LLM / soal lama) dikonversi ke <table> asli sebelum render
+  el.innerHTML = markdownTableToHtml(html ?? '')
   try { renderMathInElement(el, OPTS) } catch (e) { /* abaikan */ }
 }
 

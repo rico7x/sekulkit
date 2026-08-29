@@ -1,5 +1,6 @@
-import { Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType } from 'docx'
+import { Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType } from 'docx'
 import { tokenizeMath, latexToOmmlElement } from './latexToOmml.js'
+import { markdownTableToHtml } from './markdownTable.js'
 
 /**
  * Fetch image URL → ArrayBuffer
@@ -136,12 +137,59 @@ async function inlineToRuns(node) {
   return runs
 }
 
+// Border tabel soal
+const TBL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' }
+const TBL_BORDERS = {
+  top: TBL_BORDER, bottom: TBL_BORDER, left: TBL_BORDER, right: TBL_BORDER,
+  insideHorizontal: TBL_BORDER, insideVertical: TBL_BORDER
+}
+
+/**
+ * Konversi <table> HTML → Table docx asli (dengan border & header shading).
+ */
+async function htmlTableToDocx(el) {
+  const trs = Array.from(el.querySelectorAll('tr'))
+  const rows = []
+  for (const tr of trs) {
+    const cells = Array.from(tr.children).filter(c => ['TH', 'TD'].includes(c.tagName))
+    const cellDefs = []
+    for (const c of cells) {
+      const runs = await inlineToRuns(c)
+      const isHeader = c.tagName === 'TH'
+      if (isHeader) runs.forEach(r => { if (r instanceof TextRun) r.root[1].bold = true })
+      cellDefs.push({ runs, isHeader })
+    }
+    rows.push(cellDefs)
+  }
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: TBL_BORDERS,
+    rows: rows.map(defs => new TableRow({
+      children: defs.map(d => new TableCell({
+        shading: d.isHeader ? { type: ShadingType.CLEAR, fill: 'F1F5F9' } : undefined,
+        margins: { top: 60, bottom: 60, left: 100, right: 100 },
+        children: [new Paragraph({
+          children: d.runs.length > 0 ? d.runs : [new TextRun({ text: '' })],
+          alignment: d.isHeader ? AlignmentType.CENTER : AlignmentType.LEFT
+        })]
+      }))
+    }))
+  })
+}
+
 /**
  * Convert block HTML element → array of { runs, options }
- * Returns plain objects instead of Paragraph instances for easier merging
+ * Returns plain objects instead of Paragraph instances for easier merging.
+ * Struktur tabel: { table: TableInstance } (di-passthrough oleh buildDocxParagraphs)
  */
 async function blockToStructures(el) {
   const tag = el.tagName
+
+  // Tabel
+  if (tag === 'TABLE') {
+    return [{ table: await htmlTableToDocx(el) }]
+  }
 
   // Heading
   if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(tag)) {
@@ -222,6 +270,9 @@ async function blockToStructures(el) {
 export async function htmlToDocxStructures(html) {
   if (!html) return []
 
+  // Konversi defensif: tabel markdown (soal lama) → <table> HTML
+  html = markdownTableToHtml(html)
+
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
   const body = doc.body
@@ -245,11 +296,13 @@ export async function htmlToDocxStructures(html) {
  * @param {object} overrideOptions - e.g. { indent: { left: 360 } }
  */
 export function buildDocxParagraphs(structures, overrideOptions = {}) {
-  return structures.map(s => new Paragraph({
-    children: s.runs,
-    ...s.options,
-    ...overrideOptions
-  }))
+  return structures.map(s => s.table
+    ? s.table
+    : new Paragraph({
+        children: s.runs,
+        ...s.options,
+        ...overrideOptions
+      }))
 }
 
 /**

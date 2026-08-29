@@ -73,7 +73,7 @@
       <div v-if="form.image_prompt || form.image_url" class="card">
         <div class="card-header">
           <h3 class="font-semibold text-slate-800 text-sm flex items-center gap-2">
-            <ImageIcon class="w-4 h-4 text-violet-500" /> Gambar Ilustrasi
+            <ImageIcon class="w-4 h-4 text-slate-400" /> Gambar Ilustrasi
           </h3>
           <div class="flex items-center gap-2">
             <button type="button" @click="regenerateImage" :disabled="regenerating" class="btn-secondary btn-sm">

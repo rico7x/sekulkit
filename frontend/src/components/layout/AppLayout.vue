@@ -2,23 +2,23 @@
   <div class="flex h-screen overflow-hidden app-shell">
     <!-- Sidebar -->
     <aside
-      class="flex flex-col w-64 bg-white/80 backdrop-blur-xl border-r border-slate-200/70 flex-shrink-0 transition-all duration-300"
+      class="flex flex-col w-64 bg-white border-r border-slate-200 flex-shrink-0 transition-all duration-300"
       :class="{ '-ml-64': !sidebarOpen }"
     >
       <!-- Logo -->
       <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-100">
-        <div class="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-md shadow-primary-500/30">
+        <div class="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center">
           <FileText class="w-4 h-4 text-white" />
         </div>
         <div>
           <h1 class="text-sm font-bold text-slate-900">SoalGen</h1>
-          <p class="text-xs text-slate-500">AI Question Generator</p>
+          <p class="text-xs text-slate-400">AI Question Generator</p>
         </div>
       </div>
 
       <!-- Nav -->
       <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p class="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
+        <p class="px-3 mb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
 
         <RouterLink to="/" class="sidebar-link" :class="{ active: $route.path === '/' }">
           <LayoutDashboard class="w-4 h-4" /> Dashboard
@@ -28,14 +28,13 @@
         </RouterLink>
         <RouterLink to="/generate" class="sidebar-link" :class="{ active: $route.path === '/generate' }">
           <Sparkles class="w-4 h-4" /> Generate Soal
-          <span class="ml-auto badge badge-primary text-xs">AI</span>
         </RouterLink>
         <RouterLink to="/history" class="sidebar-link" :class="{ active: $route.path === '/history' }">
           <Clock class="w-4 h-4" /> Riwayat Generate
         </RouterLink>
 
         <div class="my-3 border-t border-slate-100" />
-        <p class="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Pengaturan</p>
+        <p class="px-3 mb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pengaturan</p>
 
         <RouterLink to="/konfigurasi" class="sidebar-link" :class="{ active: $route.path === '/konfigurasi' }">
           <Settings class="w-4 h-4" /> Konfigurasi
@@ -53,7 +52,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-slate-800 truncate">{{ auth.user?.name }}</p>
-            <p class="text-xs text-slate-500 truncate capitalize">{{ auth.user?.role }}</p>
+            <p class="text-xs text-slate-400 truncate capitalize">{{ auth.user?.role }}</p>
           </div>
         </RouterLink>
         <button @click="handleLogout" class="btn-ghost w-full mt-1 text-xs justify-center text-red-500 hover:bg-red-50 hover:text-red-700">
@@ -65,7 +64,7 @@
     <!-- Main content -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <!-- Topbar -->
-      <header class="bg-white/70 backdrop-blur-xl border-b border-slate-200/70 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center gap-3">
           <button @click="sidebarOpen = !sidebarOpen" class="btn-ghost p-2">
             <Menu class="w-5 h-5" />
