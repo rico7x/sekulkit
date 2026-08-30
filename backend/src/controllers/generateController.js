@@ -80,8 +80,9 @@ ATURAN PENTING:
 - Hindari soal yang trivial atau terlalu mudah ditebak
 - Untuk PG/PGK: pastikan semua pengecoh (distraktor) masuk akal
 - Variasikan bentuk pertanyaan agar tidak monoton
-- Untuk rumus matematika/fisika/kimia atau notasi ilmiah, TULIS dengan sintaks LaTeX: gunakan $...$ untuk rumus inline dan $$...$$ untuk rumus blok. Contoh inline: "Akar dari $x^2+3x-4=0$ adalah ...". Contoh blok: "$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$". Gunakan LaTeX HANYA bila materi memang memuat rumus/simbol matematis; untuk mata pelajaran non-eksakta tulis teks biasa tanpa tanda $.
+- Untuk rumus matematika/fisika/kimia atau notasi ilmiah, TULIS dengan delimiter LaTeX \( ... \) untuk rumus inline dan \[ ... \] untuk rumus blok. Contoh inline: "Akar dari \(x^2+3x-4=0\) adalah ...". Contoh blok: "\[\frac{-b \pm \sqrt{b^2-4ac}}{2a}\]". Gunakan LaTeX HANYA bila materi memang memuat rumus/simbol matematis; untuk mata pelajaran non-eksakta tulis teks biasa. JANGAN PERNAH gunakan delimiter $...$ atau $$...$$ karena bentrok dengan simbol dolar — SELALU pakai \( ... \) dan \[ ... \].
 - Jika soal membutuhkan TABEL, tulis langsung dengan tag HTML di dalam "pertanyaan": <table class="soal-table"><tr><th>Kolom 1</th><th>Kolom 2</th></tr><tr><td>isi</td><td>isi</td></tr></table>. JANGAN gunakan format markdown (tanda |).
+- Jika BEBERAPA soal merujuk pada GAMBAR YANG SAMA (misal "Perhatikan grafik/tabel/gambar berikut untuk soal nomor 1-3"): semua soal tersebut diberi "need_image": true, "image_key" yang SAMA (misal "gambar-1"), dan "image_prompt" yang SAMA. Gambar cukup dibuat SEKALI dan akan otomatis dipasang ke semua soal tersebut.
 
 
 FORMAT OUTPUT (wajib JSON murni, tidak ada teks di luar JSON):
@@ -96,6 +97,7 @@ FORMAT OUTPUT (wajib JSON murni, tidak ada teks di luar JSON):
       ${jenis_soal === 'isian' || jenis_soal === 'essay' ? `"kunci_jawaban": "jawaban yang benar",` : ''}
       ${generate_pembahasan ? `"pembahasan": "penjelasan jawaban",` : `"pembahasan": null,`}
       "need_image": true atau false,
+      "image_key": "kunci unik jika soal ini berbagi gambar dengan soal lain (misal \"gambar-1\"), kosong jika gambarnya hanya untuk soal ini",
       "image_prompt": "deskripsi gambar jika need_image true, kosong jika false. Struktur deskripsi bebas (disarankan bahasa Inggris agar image model akurat), TAPI semua label/teks yang akan muncul DI DALAM gambar WAJIB ditulis verbatim dalam bahasa ${bahasa}, contoh: labeled \"Ketinggian 4,0 cm\""
     }
   ]
@@ -244,7 +246,9 @@ export const generateController = {
 
       const maxNomor = db.prepare('SELECT MAX(nomor_urut) as m FROM soal WHERE bank_soal_id = ?').get(bank_soal_id).m || 0;
       const savedSoals = [];
-      const imageJobs = [];
+      // Kelompokkan soal yang berbagi gambar: image_key sama (ditandai LLM),
+      // atau prompt identik (fallback). Satu grup = satu gambar untuk banyak soal.
+      const imageGroups = new Map();
 
       // Simpan semua soal dulu ke DB
       db.transaction(() => {
@@ -271,7 +275,14 @@ export const generateController = {
           }
 
           if (needImg) {
-            imageJobs.push({ soalId, imagePrompt: s.image_prompt, soalContext: pertanyaanHtml });
+            const norm = String(s.image_prompt || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} ]/gu, '').trim();
+            const gkey = (s.image_key && String(s.image_key).trim())
+              ? `key:${String(s.image_key).trim()}`
+              : `prompt:${norm}`;
+            if (!imageGroups.has(gkey)) {
+              imageGroups.set(gkey, { soalIds: [], imagePrompt: s.image_prompt, soalContext: pertanyaanHtml });
+            }
+            imageGroups.get(gkey).soalIds.push(soalId);
           }
 
           const opsi = db.prepare('SELECT * FROM opsi_jawaban WHERE soal_id = ? ORDER BY urutan').all(soalId);
@@ -287,7 +298,10 @@ export const generateController = {
         });
       })();
 
-      // Generate gambar ilustrasi untuk soal yang butuh gambar (jika user memilih model gambar).
+      const imageJobs = Array.from(imageGroups.values());
+      const totalSoalButuhGambar = imageJobs.reduce((a, j) => a + j.soalIds.length, 0);
+
+      // Generate gambar ilustrasi — satu gambar per kelompok soal (jika user memilih model gambar).
       // Gagal generate 1 gambar tidak menggagalkan soal — image_prompt tetap tersimpan dan bisa diregenerate manual.
       let imagesGenerated = 0;
       let imagesFailed = 0;
@@ -298,18 +312,19 @@ export const generateController = {
 
         if (!imgCfg.apiKey && imageProvider !== '9router') {
           sendEvent('image', {
-            soal_id: null,
+            soal_ids: [],
             image_url: null,
             error: `API Key ${imageProvider} belum dikonfigurasi — semua gambar dilewati`
           });
         } else {
-          sendEvent('status', { message: `Menggenerate ${imageJobs.length} gambar ilustrasi...` });
+          const shareInfo = totalSoalButuhGambar > imageJobs.length ? ` (untuk ${totalSoalButuhGambar} soal)` : '';
+          sendEvent('status', { message: `Menggenerate ${imageJobs.length} gambar ilustrasi${shareInfo}...` });
           let finished = 0;
 
           await runWithConcurrency(imageJobs, 2, async (job) => {
             try {
-              // Refine prompt: model teks menulis ulang deskripsi mentah jadi prompt detail
-              // (tata letak presisi + label eksak untuk diagram, detail visual untuk ilustrasi).
+              // Refine prompt sekali per kelompok: model teks menulis ulang deskripsi mentah
+              // jadi prompt detail (tata letak presisi + label eksak untuk diagram, dsb).
               // Gagal refine → fallback ke prompt mentah + style suffix default.
               let finalPrompt;
               try {
@@ -322,7 +337,7 @@ export const generateController = {
                   soalContext: job.soalContext || ''
                 });
               } catch (refineErr) {
-                console.error(`Refine prompt gagal (soal ${job.soalId}), pakai prompt mentah:`, refineErr.message);
+                console.error(`Refine prompt gagal (${job.soalIds.length} soal), pakai prompt mentah:`, refineErr.message);
                 finalPrompt = buildImagePrompt(job.imagePrompt);
               }
 
@@ -334,15 +349,19 @@ export const generateController = {
                 extraHeaders: imgCfg.extraHeaders
               });
               const url = saveGeneratedImage(req.user.id, buffer, mimeType);
-              db.prepare("UPDATE soal SET image_url = ?, updated_at = datetime('now') WHERE id = ?").run(url, job.soalId);
-              const soalEntry = savedSoals.find(s => s.id === job.soalId);
-              if (soalEntry) soalEntry.image_url = url;
+              // Satu gambar dipasang ke semua soal dalam kelompok
+              const ph = job.soalIds.map(() => '?').join(',');
+              db.prepare(`UPDATE soal SET image_url = ?, updated_at = datetime('now') WHERE id IN (${ph})`).run(url, ...job.soalIds);
+              job.soalIds.forEach(id => {
+                const soalEntry = savedSoals.find(s => s.id === id);
+                if (soalEntry) soalEntry.image_url = url;
+              });
               imagesGenerated++;
-              sendEvent('image', { soal_id: job.soalId, image_url: url, refined_prompt: finalPrompt, progress: `${++finished}/${imageJobs.length}` });
+              sendEvent('image', { soal_ids: job.soalIds, image_url: url, refined_prompt: finalPrompt, progress: `${++finished}/${imageJobs.length}` });
             } catch (err) {
               imagesFailed++;
-              console.error(`Image gen gagal untuk soal ${job.soalId}:`, err.message);
-              sendEvent('image', { soal_id: job.soalId, image_url: null, error: err.message, progress: `${++finished}/${imageJobs.length}` });
+              console.error(`Image gen gagal untuk ${job.soalIds.length} soal:`, err.message);
+              sendEvent('image', { soal_ids: job.soalIds, image_url: null, error: err.message, progress: `${++finished}/${imageJobs.length}` });
             }
           });
         }

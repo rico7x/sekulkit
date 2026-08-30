@@ -244,7 +244,7 @@ const mathPreview = computed(() => {
 function insertMath() {
   const t = mathInput.value.trim()
   if (!t || !editor.value) return
-  const wrapped = mathDisplay.value ? `$$${t}$$` : `$${t}$`
+  const wrapped = mathDisplay.value ? `\\[${t}\\]` : `\\(${t}\\)`
   editor.value.chain().focus().insertContent(wrapped).run()
   mathInput.value = ''
   showMathInput.value = false

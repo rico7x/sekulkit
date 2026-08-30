@@ -60,7 +60,9 @@ export function latexToOmmlElement(latex, display = false) {
 }
 
 /**
- * Pisah teks -> segmen {type:'text'|'math'}. Proses $$ sebelum $.
+ * Pisah teks -> segmen {type:'text'|'math'}.
+ * Delimiter utama: \( ... \) inline dan \[ ... \] blok (bebas bentrok simbol dolar).
+ * $ / $$ tetap didukung sebagai fallback untuk soal lama.
  * Tolak kandidat $ tunggal yang isinya kosong/whitespace-edged/angka-saja (mis. "$5")
  * dan hormati escape "\$".
  */
@@ -71,7 +73,34 @@ export function tokenizeMath(text) {
   const pushText = () => { if (buf) { tokens.push({ type: 'text', value: buf }); buf = '' } }
   while (i < text.length) {
     const c = text[i]
+    // escape \$ → dolar literal (legacy)
     if (c === '\\' && text[i + 1] === '$') { buf += '$'; i += 2; continue }
+    // \( ... \) inline
+    if (c === '\\' && text[i + 1] === '(') {
+      const end = text.indexOf('\\)', i + 2)
+      if (end !== -1) {
+        const inner = text.slice(i + 2, end)
+        if (inner.trim().length > 0) {
+          pushText()
+          tokens.push({ type: 'math', latex: inner, display: false })
+          i = end + 2
+          continue
+        }
+      }
+    }
+    // \[ ... \] blok
+    if (c === '\\' && text[i + 1] === '[') {
+      const end = text.indexOf('\\]', i + 2)
+      if (end !== -1) {
+        const inner = text.slice(i + 2, end)
+        if (inner.trim().length > 0) {
+          pushText()
+          tokens.push({ type: 'math', latex: inner, display: true })
+          i = end + 2
+          continue
+        }
+      }
+    }
     if (c === '$') {
       const display = text[i + 1] === '$'
       const delim = display ? '$$' : '$'
