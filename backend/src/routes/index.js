@@ -58,6 +58,7 @@ router.post('/config/templates', authMiddleware, configController.createTemplate
 router.put('/config/templates/:id', authMiddleware, configController.updateTemplate);
 router.delete('/config/templates/:id', authMiddleware, configController.deleteTemplate);
 router.get('/config/test-api-key', authMiddleware, configController.testApiKey);
+router.post('/config/test-api-key', authMiddleware, configController.testApiKey);
 router.get('/config/openrouter-models', authMiddleware, configController.getOpenRouterModels);
 router.get('/config/remote-models', authMiddleware, configController.getRemoteModels);
 

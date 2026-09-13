@@ -169,13 +169,17 @@ export const generateController = {
     try {
       sendEvent('status', { message: 'Menghubungi AI...' });
 
+      const headers = {
+        'Content-Type': 'application/json',
+        ...extraHeaders
+      };
+      if (providerApiKey) {
+        headers['Authorization'] = `Bearer ${providerApiKey}`;
+      }
+
       const aiResponse = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${providerApiKey}`,
-          ...extraHeaders
-        },
+        headers,
         body: JSON.stringify({
           model: modelConfig.model_id,
           max_tokens: modelConfig.max_tokens || 4096,

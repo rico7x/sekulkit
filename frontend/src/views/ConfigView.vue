@@ -45,13 +45,13 @@
       </div>
 
       <div class="card">
-        <div class="card-header"><h3 class="font-semibold text-slate-800">9router (opsional)</h3></div>
+        <div class="card-header"><h3 class="font-semibold text-slate-800">9router / Endpoint AI (opsional)</h3></div>
         <div class="card-body space-y-4">
           <p class="text-sm text-slate-600">
-            9router adalah proxy AI lokal. Cocok untuk development atau jika punya endpoint OpenAI-compatible sendiri.
+            Proxy AI lokal atau endpoint OpenAI-compatible kustom (cth: 9router, vLLM, Ollama, LM Studio, Groq, dsb).
           </p>
           <div>
-            <label class="label">Base URL</label>
+            <label class="label">Endpoint / Base URL</label>
             <input v-model="ninerouterBaseUrl" type="text" class="input font-mono" placeholder="http://localhost:20128/v1" />
           </div>
           <div>
@@ -63,7 +63,7 @@
           </div>
           <div class="flex gap-3">
             <button @click="saveNinerouterConfig" class="btn-primary" :disabled="savingNrKey">
-              {{ savingNrKey ? 'Menyimpan...' : 'Simpan' }}
+              {{ savingNrKey ? 'Menyimpan...' : 'Simpan Endpoint' }}
             </button>
             <button @click="testApiKey('9router')" class="btn-secondary" :disabled="testingNrKey">
               {{ testingNrKey ? 'Testing...' : 'Test Koneksi' }}
@@ -308,11 +308,26 @@ const editTemplateId = ref(null)
 const savingTemplate = ref(false)
 const templateForm = ref({ name: '', jenis_soal: 'pg', template: '' })
 
+async function fetchConfig() {
+  try {
+    const { data } = await api.get('/config')
+    if (data?.data) {
+      if (data.data.openrouter_api_key) apiKey.value = data.data.openrouter_api_key
+      if (data.data.ninerouter_base_url) ninerouterBaseUrl.value = data.data.ninerouter_base_url
+      if (data.data.ninerouter_api_key) ninerouterApiKey.value = data.data.ninerouter_api_key
+    }
+  } catch (err) {
+    console.error('Gagal mengambil konfigurasi:', err)
+  }
+}
+
 async function saveApiKey() {
-  if (!apiKey.value) return toast.error('API key tidak boleh kosong')
+  const keyToSave = apiKey.value?.trim()
+  if (!keyToSave) return toast.error('API key tidak boleh kosong')
   savingKey.value = true
   try {
-    await api.post('/config', { key: 'openrouter_api_key', value: apiKey.value })
+    await api.post('/config', { key: 'openrouter_api_key', value: keyToSave })
+    apiKey.value = keyToSave
     toast.success('API key disimpan!')
   } catch { toast.error('Gagal menyimpan') }
   finally { savingKey.value = false }
@@ -321,11 +336,17 @@ async function saveApiKey() {
 async function saveNinerouterConfig() {
   savingNrKey.value = true
   try {
-    if (ninerouterBaseUrl.value) {
-      await api.post('/config', { key: 'ninerouter_base_url', value: ninerouterBaseUrl.value })
-    }
-    await api.post('/config', { key: 'ninerouter_api_key', value: ninerouterApiKey.value || '' })
-    toast.success('Konfigurasi 9router disimpan!')
+    const trimmedUrl = (ninerouterBaseUrl.value || '').trim().replace(/\/+$/, '')
+    const trimmedKey = (ninerouterApiKey.value || '').trim()
+    await api.post('/config', {
+      configs: {
+        ninerouter_base_url: trimmedUrl,
+        ninerouter_api_key: trimmedKey
+      }
+    })
+    ninerouterBaseUrl.value = trimmedUrl
+    ninerouterApiKey.value = trimmedKey
+    toast.success('Konfigurasi Endpoint AI disimpan!')
   } catch { toast.error('Gagal menyimpan') }
   finally { savingNrKey.value = false }
 }
@@ -339,7 +360,14 @@ async function testApiKey(provider = 'openrouter') {
     testResult.value = null
   }
   try {
-    const { data } = await api.get(`/config/test-api-key?provider=${provider}`)
+    const payload = { provider }
+    if (provider === '9router') {
+      payload.baseUrl = (ninerouterBaseUrl.value || '').trim().replace(/\/+$/, '')
+      payload.apiKey = (ninerouterApiKey.value || '').trim()
+    } else {
+      payload.apiKey = (apiKey.value || '').trim()
+    }
+    const { data } = await api.post('/config/test-api-key', payload)
     if (provider === '9router') testNrResult.value = data
     else testResult.value = data
   } catch (err) {
@@ -438,8 +466,15 @@ async function deleteTemplate(id) {
 }
 
 onMounted(async () => {
-  await fetchModels()
-  const { data: tmplData } = await api.get('/config/templates')
-  templates.value = tmplData.data
+  await Promise.all([
+    fetchConfig(),
+    fetchModels()
+  ])
+  try {
+    const { data: tmplData } = await api.get('/config/templates')
+    templates.value = tmplData.data
+  } catch (err) {
+    console.error('Gagal mengambil template:', err)
+  }
 })
 </script>

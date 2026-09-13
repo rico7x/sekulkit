@@ -107,9 +107,12 @@ OUTPUT: SATU paragraf prompt (struktur bahasa Inggris, semua label dalam gambar 
 DESKRIPSI MENTAH:
 ${String(rawPrompt || '').trim()}`;
 
+  const headers = { 'Content-Type': 'application/json', ...extraHeaders };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, ...extraHeaders },
+    headers,
     body: JSON.stringify({
       model,
       temperature: 0.4,
@@ -148,9 +151,12 @@ function extractImageUrlFromChat(data) {
 }
 
 async function generateViaImagesEndpoint({ baseUrl, apiKey, extraHeaders, model, prompt }) {
+  const headers = { 'Content-Type': 'application/json', ...extraHeaders };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const res = await fetch(`${baseUrl}/images/generations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, ...extraHeaders },
+    headers,
     body: JSON.stringify({ model, prompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
     signal: AbortSignal.timeout(TIMEOUT_MS)
   });
@@ -166,9 +172,12 @@ async function generateViaImagesEndpoint({ baseUrl, apiKey, extraHeaders, model,
 }
 
 async function generateViaChatModalities({ baseUrl, apiKey, extraHeaders, model, prompt }) {
+  const headers = { 'Content-Type': 'application/json', ...extraHeaders };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, ...extraHeaders },
+    headers,
     body: JSON.stringify({
       model,
       modalities: ['image', 'text'],

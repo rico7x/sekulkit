@@ -7,16 +7,22 @@ import { db } from '../db/init.js';
  */
 function resolveProviderConfig(provider, userId) {
   const isOpenRouter = provider === 'openrouter';
-  const baseUrl = isOpenRouter
+  const baseUrlKey = isOpenRouter ? 'openrouter_base_url' : 'ninerouter_base_url';
+  const envBaseUrlFallback = isOpenRouter
     ? process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
     : process.env.NINEROUTER_BASE_URL || 'http://localhost:20128/v1';
+
+  const baseUrlRow = db.prepare('SELECT value FROM app_config WHERE user_id = ? AND key = ?')
+    .get(userId, baseUrlKey);
+  let baseUrl = (baseUrlRow?.value?.trim() || envBaseUrlFallback).trim();
+  baseUrl = baseUrl.replace(/\/+$/, '');
 
   const configKey = isOpenRouter ? 'openrouter_api_key' : 'ninerouter_api_key';
   const envFallbackKey = isOpenRouter ? 'OPENROUTER_API_KEY' : 'NINEROUTER_API_KEY';
 
   const configRow = db.prepare('SELECT value FROM app_config WHERE user_id = ? AND key = ?')
     .get(userId, configKey);
-  const apiKey = configRow?.value || process.env[envFallbackKey] || '';
+  const apiKey = (configRow ? configRow.value : (process.env[envFallbackKey] || '')).trim();
 
   const extraHeaders = isOpenRouter
     ? { 'HTTP-Referer': 'https://sekulkit.app', 'X-Title': 'SekulKit' }
@@ -28,8 +34,15 @@ function resolveProviderConfig(provider, userId) {
 /**
  * Test connection to a provider using its /models endpoint.
  */
-async function testProviderConnection(provider, userId) {
-  const { baseUrl, apiKey, extraHeaders } = resolveProviderConfig(provider, userId);
+async function testProviderConnection(provider, userId, overrideConfig = {}) {
+  let { baseUrl, apiKey, extraHeaders } = resolveProviderConfig(provider, userId);
+
+  if (overrideConfig.baseUrl !== undefined && overrideConfig.baseUrl !== null && String(overrideConfig.baseUrl).trim() !== '') {
+    baseUrl = String(overrideConfig.baseUrl).trim().replace(/\/+$/, '');
+  }
+  if (overrideConfig.apiKey !== undefined && overrideConfig.apiKey !== null) {
+    apiKey = String(overrideConfig.apiKey).trim();
+  }
 
   if (!apiKey && provider === '9router') {
     // 9router local sering no-auth — allow empty key
@@ -38,14 +51,34 @@ async function testProviderConnection(provider, userId) {
   }
 
   try {
+    const headers = { ...extraHeaders };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     const r = await fetch(`${baseUrl}/models`, {
-      headers: { 'Authorization': `Bearer ${apiKey}`, ...extraHeaders }
+      headers,
+      signal: controller.signal
     });
-    if (!r.ok) throw new Error(`Status ${r.status}`);
+    clearTimeout(timeoutId);
+
+    if (!r.ok) {
+      const errBody = await r.text().catch(() => '');
+      throw new Error(`HTTP ${r.status}${errBody ? ': ' + errBody.slice(0, 150) : ''}`);
+    }
     const data = await r.json();
-    return { success: true, message: `${provider} API Key valid`, model_count: data.data?.length || 0 };
+    const modelCount = data.data?.length || 0;
+    return {
+      success: true,
+      message: `Koneksi ${provider} berhasil (${modelCount} model tersedia)`,
+      model_count: modelCount
+    };
   } catch (err) {
-    return { success: false, message: `${provider} API Key tidak valid: ${err.message}` };
+    const msg = err.name === 'AbortError' ? 'Koneksi timeout (15 detik)' : err.message;
+    return { success: false, message: `Koneksi ${provider} gagal: ${msg}` };
   }
 }
 
@@ -61,10 +94,24 @@ async function fetchRemoteModels(provider, userId) {
     throw new Error(`API Key ${provider} belum dikonfigurasi`);
   }
 
+  const headers = { ...extraHeaders };
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+
   const r = await fetch(`${baseUrl}/models`, {
-    headers: { 'Authorization': `Bearer ${apiKey}`, ...extraHeaders }
+    headers,
+    signal: controller.signal
   });
-  if (!r.ok) throw new Error(`Status ${r.status}`);
+  clearTimeout(timeoutId);
+
+  if (!r.ok) {
+    const errBody = await r.text().catch(() => '');
+    throw new Error(`Status ${r.status}${errBody ? ': ' + errBody.slice(0, 150) : ''}`);
+  }
   const data = await r.json();
 
   // Normalize: provider responses may differ slightly
@@ -75,7 +122,7 @@ async function fetchRemoteModels(provider, userId) {
     const isFree = m.pricing?.prompt === '0' || !m.pricing;
     return {
       id: m.id,
-      name: m.name,
+      name: m.name || m.id,
       context_length: m.context_length,
       is_free: isFree,
       pricing: m.pricing
@@ -93,21 +140,39 @@ export const configController = {
     const configs = db.prepare('SELECT key, value FROM app_config WHERE user_id = ?').all(req.user.id);
     const result = {};
     configs.forEach(c => {
-      result[c.key] = c.key.includes('api_key') ? '***' + c.value.slice(-4) : c.value;
+      result[c.key] = c.value;
     });
     res.json({ data: result });
   },
 
   setConfig(req, res) {
-    const { key, value } = req.body;
-    if (!key || value === undefined) return res.status(400).json({ message: 'Key dan value diperlukan' });
+    const items = [];
+    if (req.body && typeof req.body.configs === 'object' && req.body.configs !== null) {
+      for (const [k, v] of Object.entries(req.body.configs)) {
+        if (v !== undefined) items.push({ key: k, value: v });
+      }
+    } else if (req.body && req.body.key && req.body.value !== undefined) {
+      items.push({ key: req.body.key, value: req.body.value });
+    } else {
+      return res.status(400).json({ message: 'Key dan value diperlukan' });
+    }
 
-    const id = uuidv4();
-    db.prepare(`
+    const insertStmt = db.prepare(`
       INSERT INTO app_config (id, user_id, key, value) VALUES (?, ?, ?, ?)
       ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    `).run(id, req.user.id, key, value);
+    `);
 
+    const saveTransaction = db.transaction((configsToSave) => {
+      for (const item of configsToSave) {
+        if (typeof item.value === 'string' && item.value.startsWith('***')) {
+          continue; // jangan timpa data riil dengan placeholder masked
+        }
+        const val = typeof item.value === 'string' ? item.value.trim() : String(item.value ?? '');
+        insertStmt.run(uuidv4(), req.user.id, item.key, val);
+      }
+    });
+
+    saveTransaction(items);
     res.json({ message: 'Konfigurasi disimpan' });
   },
 
@@ -208,8 +273,12 @@ export const configController = {
 
   // Provider-aware connection test
   async testApiKey(req, res) {
-    const provider = req.query.provider || 'openrouter';
-    const result = await testProviderConnection(provider, req.user.id);
+    const provider = req.body?.provider || req.query?.provider || 'openrouter';
+    const override = {
+      baseUrl: req.body?.baseUrl || req.query?.baseUrl,
+      apiKey: req.body?.apiKey !== undefined ? req.body.apiKey : req.query?.apiKey
+    };
+    const result = await testProviderConnection(provider, req.user.id, override);
     if (!result.success) return res.status(400).json(result);
     res.json(result);
   },
